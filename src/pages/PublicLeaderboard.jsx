@@ -13,6 +13,7 @@ export default function PublicLeaderboard() {
   const [heaviestFish, setHeaviestFish] = useState(null)
   const [lightestFish, setLightestFish] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [latestEntry, setLatestEntry] = useState(null)
 
   // Fetch leaderboard data
   const fetchLeaderboard = async () => {
@@ -38,6 +39,39 @@ export default function PublicLeaderboard() {
       
       setHeaviestFish(heaviest || null)
       setLightestFish(lightest || null)
+
+      // Get latest entry (with or without photo)
+      const { data: latestData, error: latestError } = await supabase
+        .from('catches')
+        .select(`
+          id,
+          catfish_count,
+          photo_urls,
+          created_at,
+          team_id,
+          teams (
+            team_number,
+            competitor1_name,
+            competitor2_name,
+            competitor3_name,
+            division
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (!latestError && latestData) {
+        // Find this team's ranking
+        const teamRank = data?.findIndex(c => c.team_id === latestData.team_id) + 1
+        setLatestEntry({
+          ...latestData,
+          rank: teamRank || '-'
+        })
+      } else {
+        setLatestEntry(null)
+      }
+
       setLoading(false)
     } catch (error) {
       console.error('Error fetching leaderboard:', error)
@@ -121,6 +155,16 @@ export default function PublicLeaderboard() {
                 <h1 className="text-4xl font-bold text-blue-900">🏆 Catfish Cull 2026</h1>
                 <p className="text-xl text-gray-600">Live Results</p>
               </div>
+            </div>
+            
+            {/* Sponsor - Top Right */}
+            <div className="text-center">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Proudly Sponsored By</p>
+              <img 
+                src={SPONSOR_LOGO} 
+                alt="Hunting & Fishing Taupo" 
+                className="h-16 object-contain"
+              />
             </div>
           </div>
 
@@ -270,19 +314,60 @@ export default function PublicLeaderboard() {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Footer - Latest Entry */}
         <div className="text-center mt-6">
-          {/* Sponsor Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
-            <p className="text-gray-600 text-sm mb-3 uppercase tracking-wide">Proudly Sponsored By</p>
-            <div className="flex justify-center">
-              <img 
-                src={SPONSOR_LOGO} 
-                alt="Hunting & Fishing Taupo" 
-                className="h-20 object-contain"
-              />
+          {latestEntry && (
+            <div className="bg-white rounded-lg shadow-2xl p-6 mb-4">
+              <h3 className="text-sm text-gray-500 uppercase tracking-wide mb-4">🔥 Latest Entry</h3>
+              <div className="flex items-center justify-center gap-6 max-w-2xl mx-auto">
+                {/* Photo or Placeholder */}
+                <div className="flex-shrink-0">
+                  {latestEntry.photo_urls && latestEntry.photo_urls.length > 0 ? (
+                    <img 
+                      src={latestEntry.photo_urls[0]} 
+                      alt="Latest catch" 
+                      className="w-32 h-32 object-cover rounded-lg border-4 border-green-400 shadow-xl"
+                    />
+                  ) : (
+                    <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg border-4 border-gray-300 shadow-xl flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-4xl mb-1">🎣</div>
+                        <p className="text-xs text-gray-600">No photo</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Info */}
+                <div className="flex-1 text-left">
+                  <div className="mb-3">
+                    <p className="text-3xl font-bold text-gray-900">
+                      Team #{latestEntry.teams.team_number}
+                    </p>
+                    <p className="text-lg text-gray-600">
+                      {latestEntry.teams.competitor1_name} & {latestEntry.teams.competitor2_name}
+                      {latestEntry.teams.competitor3_name && ` & ${latestEntry.teams.competitor3_name}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="bg-green-100 px-4 py-2 rounded-lg">
+                      <p className="text-4xl font-bold text-green-600">{latestEntry.catfish_count}</p>
+                      <p className="text-sm text-green-700">Catfish</p>
+                    </div>
+                    <div className="space-y-2">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                        {latestEntry.teams.division}
+                      </span>
+                      {latestEntry.rank !== '-' && (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800 ml-2">
+                          Currently #{latestEntry.rank}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
           
           <div className="text-white">
             <p className="text-sm">Auto-refreshes every 10 seconds • Last updated: {new Date().toLocaleTimeString()}</p>
