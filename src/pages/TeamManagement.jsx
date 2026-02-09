@@ -338,46 +338,107 @@ export default function TeamManagement() {
           </div>
         </div>
 
+        {/* Mobile-friendly scrollable table wrapper */}
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left">Team #</th>
-                <th className="px-4 py-3 text-left">Division</th>
-                <th className="px-4 py-3 text-left">Competitors</th>
-                <th className="px-4 py-3 text-left">Club</th>
-                <th className="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTeams.map((team) => (
-                <tr key={team.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 font-bold">#{team.team_number}</td>
-                  <td className="px-4 py-3">{team.division}</td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm">
+          {/* Desktop: Table view */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Team #</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Division</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Competitors</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Club</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTeams.map((team) => (
+                  <tr key={team.id} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-3 font-bold whitespace-nowrap">#{team.team_number}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{team.division}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm">
+                        <div>{team.competitor1_name} & {team.competitor2_name}</div>
+                        {team.competitor3_name && (
+                          <div className="text-gray-500">+ {team.competitor3_name}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{team.club || '-'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => startEdit(team)}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(team.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredTeams.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                      No teams found. Click "Add Team" to create one.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: Card view */}
+          <div className="md:hidden">
+            {filteredTeams.length === 0 ? (
+              <div className="px-4 py-8 text-center text-gray-500">
+                No teams found. Click "Add Team" to create one.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {filteredTeams.map((team) => (
+                  <div key={team.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="font-bold text-lg">Team #{team.team_number}</div>
+                        <div className="text-sm text-gray-600">{team.division}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => startEdit(team)}
+                          className="text-blue-600 hover:text-blue-800 p-2"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(team.id)}
+                          className="text-red-600 hover:text-red-800 p-2"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-sm space-y-1">
                       <div>{team.competitor1_name} & {team.competitor2_name}</div>
                       {team.competitor3_name && (
                         <div className="text-gray-500">+ {team.competitor3_name}</div>
                       )}
+                      {team.club && (
+                        <div className="text-gray-500 mt-2">📍 {team.club}</div>
+                      )}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">{team.club || '-'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => startEdit(team)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(team.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
                   </td>
                 </tr>
               ))}
@@ -390,6 +451,7 @@ export default function TeamManagement() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
