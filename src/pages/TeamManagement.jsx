@@ -13,6 +13,8 @@ export default function TeamManagement() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingTeam, setEditingTeam] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const [importResults, setImportResults] = useState(null)
 
   const [formData, setFormData] = useState({
     team_number: '',
@@ -114,6 +116,89 @@ export default function TeamManagement() {
     setShowAddModal(true)
   }
 
+  const handleCSVImport = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setImporting(true)
+    setImportResults(null)
+
+    try {
+      const text = await file.text()
+      const lines = text.split('\n').filter(line => line.trim())
+      
+      if (lines.length < 2) {
+        alert('CSV file is empty or invalid')
+        setImporting(false)
+        return
+      }
+
+      // Parse CSV (simple parser - handles basic CSV)
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+      const rows = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
+        const row = {}
+        headers.forEach((header, i) => {
+          row[header] = values[i] || ''
+        })
+        return row
+      })
+
+      let imported = 0
+      let errors = []
+
+      for (const row of rows) {
+        try {
+          // Map CSV columns to database fields
+          const teamData = {
+            team_number: parseInt(row['Team Number']) || 0,
+            division: row['Division'] || 'Open',
+            competitor1_name: row['Competitor 1 Name'] || '',
+            competitor1_email: row['Competitor 1 Email'] || '',
+            competitor2_name: row['Competitor 2 Name'] || '',
+            competitor2_email: row['Competitor 2 Email'] || '',
+            competitor3_name: row['Competitor 3 Name'] || '',
+            competitor3_email: row['Competitor 3 Email'] || '',
+            club: row['Club'] || '',
+            notes: row['Notes'] || ''
+          }
+
+          // Validate required fields
+          if (!teamData.team_number || !teamData.competitor1_name || !teamData.competitor2_name) {
+            errors.push(`Row ${imported + 1}: Missing required fields`)
+            continue
+          }
+
+          // Insert into database
+          const { error } = await supabase
+            .from('teams')
+            .insert([teamData])
+
+          if (error) {
+            errors.push(`Team ${teamData.team_number}: ${error.message}`)
+          } else {
+            imported++
+          }
+        } catch (err) {
+          errors.push(`Row ${imported + 1}: ${err.message}`)
+        }
+      }
+
+      setImportResults({
+        total: rows.length,
+        imported,
+        errors
+      })
+
+      fetchTeams()
+    } catch (error) {
+      alert('Error reading CSV file: ' + error.message)
+    } finally {
+      setImporting(false)
+      e.target.value = '' // Reset file input
+    }
+  }
+
   const filteredTeams = teams
     .filter(t => filterDivision === 'All' || t.division === filterDivision)
     .filter(t => 
@@ -173,6 +258,27 @@ export default function TeamManagement() {
               <option>Juniors</option>
             </select>
 
+            {/* CSV Import Button */}
+            <div className="relative">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleCSVImport}
+                className="hidden"
+                id="csv-import"
+                disabled={importing}
+              />
+              <label
+                htmlFor="csv-import"
+                className={`bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 cursor-pointer ${
+                  importing ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                {importing ? 'Importing...' : 'Import CSV'}
+              </label>
+            </div>
+
             <button
               onClick={() => {
                 resetForm()
@@ -184,6 +290,51 @@ export default function TeamManagement() {
               <Plus className="w-5 h-5" />
               Add Team
             </button>
+          </div>
+
+          {/* Import Results */}
+          {importResults && (
+            <div className={`mt-4 p-4 rounded-lg border-2 ${
+              importResults.errors.length > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'
+            }`}>
+              <h3 className="font-bold mb-2">
+                Import Complete: {importResults.imported} of {importResults.total} teams imported
+              </h3>
+              {importResults.errors.length > 0 && (
+                <div className="mt-2">
+                  <p className="font-semibold text-red-700 mb-1">Errors:</p>
+                  <ul className="text-sm text-red-600 space-y-1">
+                    {importResults.errors.slice(0, 10).map((err, i) => (
+                      <li key={i}>• {err}</li>
+                    ))}
+                    {importResults.errors.length > 10 && (
+                      <li className="text-gray-600">... and {importResults.errors.length - 10} more errors</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              <button
+                onClick={() => setImportResults(null)}
+                className="mt-2 text-sm text-blue-600 hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Template Download Link */}
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Need a template?</strong>{' '}
+              <a
+                href="/team-import-template.csv"
+                download
+                className="text-blue-600 hover:underline font-semibold"
+              >
+                Download CSV Template
+              </a>
+              {' '}with example data and correct column headers.
+            </p>
           </div>
         </div>
 
