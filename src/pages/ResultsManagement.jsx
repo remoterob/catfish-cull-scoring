@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, Clock, Download } from 'lucide-react'
 
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
 
@@ -40,6 +40,62 @@ export default function ResultsManagement() {
     fetchCatches()
     fetchEventState()
   }, [])
+
+  const exportToExcel = () => {
+    // Prepare data for export
+    const exportData = catches.map((entry, index) => {
+      const rank = entry.eligible && entry.status !== 'disqualified' ? index + 1 : 'N/A'
+      
+      return {
+        'Rank': rank,
+        'Team Number': entry.team_number,
+        'Division': entry.division,
+        'Competitor 1': entry.competitor1_name,
+        'Competitor 1 Email': entry.competitor1_email || '',
+        'Competitor 2': entry.competitor2_name,
+        'Competitor 2 Email': entry.competitor2_email || '',
+        'Competitor 3': entry.competitor3_name || '',
+        'Competitor 3 Email': entry.competitor3_email || '',
+        'Club': entry.club || '',
+        'Catfish Count': entry.catfish_count,
+        'Heaviest Fish (g)': entry.heaviest_fish_grams || '',
+        'Lightest Fish (g)': entry.lightest_fish_grams || '',
+        'Eligible': entry.eligible ? 'Yes' : 'No',
+        'Status': entry.status || 'confirmed',
+        'Protest Notes': entry.protest_notes || '',
+        'Submitted At': entry.created_at ? new Date(entry.created_at).toLocaleString() : '',
+        'Notes': entry.notes || ''
+      }
+    })
+
+    // Convert to CSV
+    const headers = Object.keys(exportData[0])
+    const csvContent = [
+      headers.join(','),
+      ...exportData.map(row => 
+        headers.map(header => {
+          const value = row[header]?.toString() || ''
+          // Escape commas and quotes
+          return value.includes(',') || value.includes('"') 
+            ? `"${value.replace(/"/g, '""')}"` 
+            : value
+        }).join(',')
+      )
+    ].join('\n')
+
+    // Download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', `catfish-cull-results-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   const updateStatus = async (catchId, newStatus, protestNotes = '') => {
     try {
@@ -113,12 +169,21 @@ export default function ResultsManagement() {
               <img src={SNZ_LOGO} alt="Spearfishing New Zealand" className="h-12 object-contain" />
               <h1 className="text-3xl font-bold text-gray-900">Manage Results</h1>
             </div>
-            <button
-              onClick={() => navigate('/admin')}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-            >
-              Back to Dashboard
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={exportToExcel}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+              >
+                <Download size={20} />
+                Export to Excel
+              </button>
+              <button
+                onClick={() => navigate('/admin')}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              >
+                Back to Dashboard
+              </button>
+            </div>
           </div>
 
           {/* Status Summary */}
