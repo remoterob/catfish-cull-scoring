@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Camera, Check } from 'lucide-react'
+import { Camera, Check, Search, AlertTriangle } from 'lucide-react'
 
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
 
@@ -9,12 +9,17 @@ export default function WeighmasterInterface() {
   const navigate = useNavigate()
   const [teams, setTeams] = useState([])
   const [teamNumber, setTeamNumber] = useState('')
+  const [searchName, setSearchName] = useState('')
+  const [filteredTeams, setFilteredTeams] = useState([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [catfishCount, setCatfishCount] = useState('')
   const [heaviestFish, setHeaviestFish] = useState('')
   const [lightestFish, setLightestFish] = useState('')
   const [photos, setPhotos] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [existingCatch, setExistingCatch] = useState(null)
+  const [isEditMode, setIsEditMode] = useState(false)
 
   useEffect(() => {
     fetchTeams()
@@ -33,10 +38,77 @@ export default function WeighmasterInterface() {
     if (teamNumber) {
       const team = teams.find(t => t.team_number === parseInt(teamNumber))
       setSelectedTeam(team || null)
+      setShowSearchResults(false)
+      if (team) {
+        checkExistingScore(team.id)
+      }
     } else {
       setSelectedTeam(null)
+      setExistingCatch(null)
+      setIsEditMode(false)
     }
   }, [teamNumber, teams])
+
+  useEffect(() => {
+    if (searchName.length >= 2) {
+      const searchLower = searchName.toLowerCase()
+      const matches = teams.filter(t => 
+        t.competitor1_name.toLowerCase().includes(searchLower) ||
+        t.competitor2_name.toLowerCase().includes(searchLower) ||
+        (t.competitor3_name && t.competitor3_name.toLowerCase().includes(searchLower))
+      )
+      setFilteredTeams(matches)
+      setShowSearchResults(true)
+    } else {
+      setFilteredTeams([])
+      setShowSearchResults(false)
+    }
+  }, [searchName, teams])
+
+  const selectTeamFromSearch = (team) => {
+    setSelectedTeam(team)
+    setTeamNumber(team.team_number.toString())
+    setSearchName('')
+    setShowSearchResults(false)
+    checkExistingScore(team.id)
+  }
+
+  const checkExistingScore = async (teamId) => {
+    try {
+      const { data, error } = await supabase
+        .from('catches')
+        .select('*')
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+        console.error('Error checking score:', error)
+        return
+      }
+
+      if (data) {
+        // Found existing score - load it into form
+        setExistingCatch(data)
+        setIsEditMode(true)
+        setCatfishCount(data.catfish_count.toString())
+        setHeaviestFish(data.heaviest_fish_grams ? data.heaviest_fish_grams.toString() : '')
+        setLightestFish(data.lightest_fish_grams ? data.lightest_fish_grams.toString() : '')
+        setPhotos(data.photo_urls || [])
+      } else {
+        // No existing score
+        setExistingCatch(null)
+        setIsEditMode(false)
+        setCatfishCount('')
+        setHeaviestFish('')
+        setLightestFish('')
+        setPhotos([])
+      }
+    } catch (err) {
+      console.error('Error:', err)
+    }
+  }
 
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files)
@@ -68,51 +140,73 @@ export default function WeighmasterInterface() {
     setSubmitting(true)
 
     try {
-      // Insert catch
-      const { data: catchData, error: catchError } = await supabase
-        .from('catches')
-        .insert([{
-          team_id: selectedTeam.id,
-          catfish_count: parseInt(catfishCount),
-          heaviest_fish_grams: heaviestFish ? parseInt(heaviestFish) : null,
-          lightest_fish_grams: lightestFish ? parseInt(lightestFish) : null,
-          photo_urls: photos,
-          status: 'provisional'
-        }])
-        .select()
-        .single()
+      if (isEditMode && existingCatch) {
+        // Update existing catch
+        const { error: updateError } = await supabase
+          .from('catches')
+          .update({
+            catfish_count: parseInt(catfishCount),
+            heaviest_fish_grams: heaviestFish ? parseInt(heaviestFish) : null,
+            lightest_fish_grams: lightestFish ? parseInt(lightestFish) : null,
+            photo_urls: photos,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingCatch.id)
 
-      if (catchError) throw catchError
+        if (updateError) throw updateError
 
-      // Send email via Netlify function
-      const emails = [selectedTeam.competitor1_email, selectedTeam.competitor2_email]
-      if (selectedTeam.competitor3_email) emails.push(selectedTeam.competitor3_email)
+        alert('Score updated successfully!')
+      } else {
+        // Insert new catch
+        const { data: catchData, error: catchError } = await supabase
+          .from('catches')
+          .insert([{
+            team_id: selectedTeam.id,
+            catfish_count: parseInt(catfishCount),
+            heaviest_fish_grams: heaviestFish ? parseInt(heaviestFish) : null,
+            lightest_fish_grams: lightestFish ? parseInt(lightestFish) : null,
+            photo_urls: photos,
+            status: 'provisional'
+          }])
+          .select()
+          .single()
 
-      const eligible = !selectedTeam.competitor3_name
+        if (catchError) throw catchError
 
-      await fetch('/.netlify/functions/send-results-email', {
-        method: 'POST',
-        body: JSON.stringify({
-          emails,
-          teamNumber: selectedTeam.team_number,
-          teamNames: `${selectedTeam.competitor1_name} & ${selectedTeam.competitor2_name}${selectedTeam.competitor3_name ? ' & ' + selectedTeam.competitor3_name : ''}`,
-          catfishCount: parseInt(catfishCount),
-          division: selectedTeam.division,
-          heaviestFish: heaviestFish ? parseInt(heaviestFish) : null,
-          lightestFish: lightestFish ? parseInt(lightestFish) : null,
-          eligible
+        // Send email via Netlify function
+        const emails = [selectedTeam.competitor1_email, selectedTeam.competitor2_email]
+        if (selectedTeam.competitor3_email) emails.push(selectedTeam.competitor3_email)
+
+        const eligible = !selectedTeam.competitor3_name
+
+        await fetch('/.netlify/functions/send-results-email', {
+          method: 'POST',
+          body: JSON.stringify({
+            emails,
+            teamNumber: selectedTeam.team_number,
+            teamNames: `${selectedTeam.competitor1_name} & ${selectedTeam.competitor2_name}${selectedTeam.competitor3_name ? ' & ' + selectedTeam.competitor3_name : ''}`,
+            catfishCount: parseInt(catfishCount),
+            division: selectedTeam.division,
+            heaviestFish: heaviestFish ? parseInt(heaviestFish) : null,
+            lightestFish: lightestFish ? parseInt(lightestFish) : null,
+            eligible
+          })
         })
-      })
 
-      alert('Score submitted successfully! Email sent to team.')
+        alert('Score submitted successfully! Email sent to team.')
+      }
       
       // Reset form
       setTeamNumber('')
+      setSearchName('')
       setSelectedTeam(null)
       setCatfishCount('')
       setHeaviestFish('')
       setLightestFish('')
       setPhotos([])
+      setShowSearchResults(false)
+      setExistingCatch(null)
+      setIsEditMode(false)
     } catch (error) {
       console.error('Error submitting:', error)
       alert('Error submitting score: ' + error.message)
@@ -139,22 +233,84 @@ export default function WeighmasterInterface() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Team Number */}
-            <div>
-              <label className="block text-lg font-semibold mb-2">Team Number</label>
-              <input
-                type="number"
-                required
-                value={teamNumber}
-                onChange={(e) => setTeamNumber(e.target.value)}
-                placeholder="Enter team number"
-                className="w-full px-4 py-3 text-2xl border-2 rounded-lg focus:border-blue-500 focus:outline-none"
-              />
+            {/* Team Number OR Search */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-lg font-semibold mb-2">Team Number</label>
+                <input
+                  type="number"
+                  value={teamNumber}
+                  onChange={(e) => {
+                    setTeamNumber(e.target.value)
+                    setSearchName('') // Clear search when typing number
+                  }}
+                  placeholder="Enter team number"
+                  className="w-full px-4 py-3 text-2xl border-2 rounded-lg focus:border-blue-500 focus:outline-none"
+                  disabled={searchName.length > 0}
+                />
+              </div>
+
+              <div className="relative">
+                <label className="block text-lg font-semibold mb-2">OR Search by Name</label>
+                <input
+                  type="text"
+                  value={searchName}
+                  onChange={(e) => {
+                    setSearchName(e.target.value)
+                    setTeamNumber('') // Clear team number when searching
+                  }}
+                  placeholder="Type competitor name..."
+                  className="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 focus:outline-none"
+                  disabled={teamNumber.length > 0}
+                />
+                
+                {/* Search Results Dropdown */}
+                {showSearchResults && filteredTeams.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border-2 border-blue-500 rounded-lg shadow-xl max-h-96 overflow-y-auto">
+                    {filteredTeams.map(team => (
+                      <button
+                        key={team.id}
+                        type="button"
+                        onClick={() => selectTeamFromSearch(team)}
+                        className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b last:border-b-0 transition"
+                      >
+                        <div className="font-bold text-blue-600">Team #{team.team_number}</div>
+                        <div className="text-sm text-gray-700">
+                          {team.competitor1_name} & {team.competitor2_name}
+                          {team.competitor3_name && ` & ${team.competitor3_name}`}
+                        </div>
+                        <div className="text-xs text-gray-500">{team.division}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {showSearchResults && filteredTeams.length === 0 && searchName.length >= 2 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-4">
+                    <p className="text-gray-500 text-center">No teams found matching "{searchName}"</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Team Info Display */}
             {selectedTeam && (
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+              <div className={`border-2 rounded-lg p-4 ${
+                isEditMode 
+                  ? 'bg-orange-50 border-orange-400' 
+                  : 'bg-blue-50 border-blue-200'
+              }`}>
+                {isEditMode && (
+                  <div className="mb-3 pb-3 border-b-2 border-orange-300">
+                    <div className="flex items-center gap-2 text-orange-800 font-bold">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span>EDIT MODE - This team already has a score</span>
+                    </div>
+                    <p className="text-sm text-orange-700 mt-1">
+                      Existing score loaded. Make changes and submit to update.
+                    </p>
+                  </div>
+                )}
                 <h3 className="font-bold text-lg mb-2">Team #{selectedTeam.team_number}</h3>
                 <p><strong>Division:</strong> {selectedTeam.division}</p>
                 <p><strong>Competitors:</strong> {selectedTeam.competitor1_name} & {selectedTeam.competitor2_name}</p>
@@ -163,6 +319,18 @@ export default function WeighmasterInterface() {
                     <p className="text-orange-600"><strong>+ {selectedTeam.competitor3_name}</strong></p>
                     <p className="text-sm text-orange-600 mt-2">⚠️ 3-person team - Not eligible for prizes</p>
                   </>
+                )}
+                {isEditMode && existingCatch && (
+                  <div className="mt-3 pt-3 border-t-2 border-orange-200 text-sm">
+                    <p className="text-gray-600">
+                      <strong>Original submission:</strong> {new Date(existingCatch.created_at).toLocaleString()}
+                    </p>
+                    {existingCatch.updated_at !== existingCatch.created_at && (
+                      <p className="text-gray-600">
+                        <strong>Last updated:</strong> {new Date(existingCatch.updated_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -270,14 +438,18 @@ export default function WeighmasterInterface() {
             <button
               type="submit"
               disabled={!selectedTeam || !catfishCount || submitting}
-              className="w-full bg-green-600 text-white py-4 rounded-lg text-xl font-bold hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className={`w-full py-4 rounded-lg text-xl font-bold disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                isEditMode 
+                  ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
             >
               {submitting ? (
                 'Submitting...'
               ) : (
                 <>
                   <Check className="w-6 h-6" />
-                  Submit Score & Send Email
+                  {isEditMode ? 'Update Score' : 'Submit Score & Send Email'}
                 </>
               )}
             </button>
@@ -287,10 +459,13 @@ export default function WeighmasterInterface() {
         <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
           <h3 className="font-bold text-yellow-800 mb-2">Quick Tips</h3>
           <ul className="text-yellow-800 text-sm space-y-1">
-            <li>• Enter team number first - team details will auto-fill</li>
+            <li>• Enter team number OR search by competitor name</li>
+            <li>• Search works with partial names (e.g., "John" finds "John Smith")</li>
+            <li>• If a team already has a score, it will load automatically for editing</li>
+            <li>• Edit mode shows an orange warning - make changes and submit to update</li>
             <li>• Catfish count is required, prize fish weights are optional</li>
             <li>• Photos are optional but recommended for verification</li>
-            <li>• Emails are sent automatically when you submit</li>
+            <li>• Emails are sent automatically for new scores (not for updates)</li>
           </ul>
         </div>
       </div>
