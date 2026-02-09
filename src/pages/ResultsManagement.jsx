@@ -13,13 +13,53 @@ export default function ResultsManagement() {
 
   const fetchCatches = async () => {
     try {
-      const { data, error } = await supabase
-        .from('leaderboard')
-        .select('*')
+      // Get catches with full team details
+      const { data: catchesData, error: catchesError } = await supabase
+        .from('catches')
+        .select(`
+          *,
+          teams (
+            team_number,
+            division,
+            competitor1_name,
+            competitor1_email,
+            competitor2_name,
+            competitor2_email,
+            competitor3_name,
+            competitor3_email,
+            club,
+            notes
+          )
+        `)
         .order('catfish_count', { ascending: false })
 
-      if (error) throw error
-      setCatches(data || [])
+      if (catchesError) throw catchesError
+      
+      // Flatten the data structure for easier use
+      const flattenedData = catchesData?.map(entry => ({
+        id: entry.id,
+        team_id: entry.team_id,
+        team_number: entry.teams.team_number,
+        division: entry.teams.division,
+        competitor1_name: entry.teams.competitor1_name,
+        competitor1_email: entry.teams.competitor1_email,
+        competitor2_name: entry.teams.competitor2_name,
+        competitor2_email: entry.teams.competitor2_email,
+        competitor3_name: entry.teams.competitor3_name,
+        competitor3_email: entry.teams.competitor3_email,
+        club: entry.teams.club,
+        notes: entry.teams.notes,
+        catfish_count: entry.catfish_count,
+        heaviest_fish_grams: entry.heaviest_fish_grams,
+        lightest_fish_grams: entry.lightest_fish_grams,
+        photo_urls: entry.photo_urls,
+        status: entry.status,
+        protest_notes: entry.protest_notes,
+        created_at: entry.created_at,
+        eligible: !entry.teams.competitor3_name // 2-person teams are eligible
+      })) || []
+
+      setCatches(flattenedData)
       setLoading(false)
     } catch (error) {
       console.error('Error:', error)

@@ -62,11 +62,17 @@ export default function PublicLeaderboard() {
         .single()
 
       if (!latestError && latestData) {
-        // Find this team's ranking
-        const teamRank = data?.findIndex(c => c.team_id === latestData.team_id) + 1
+        // Find this team's overall ranking
+        const overallRank = data?.findIndex(c => c.team_id === latestData.team_id) + 1
+        
+        // Find this team's division ranking
+        const divisionTeams = data?.filter(c => c.division === latestData.teams.division) || []
+        const divisionRank = divisionTeams.findIndex(c => c.team_id === latestData.team_id) + 1
+        
         setLatestEntry({
           ...latestData,
-          rank: teamRank || '-'
+          overallRank: overallRank || '-',
+          divisionRank: divisionRank || '-'
         })
       } else {
         setLatestEntry(null)
@@ -354,14 +360,23 @@ export default function PublicLeaderboard() {
                       <p className="text-sm text-green-700">Catfish</p>
                     </div>
                     <div className="space-y-2">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
-                        {latestEntry.teams.division}
-                      </span>
-                      {latestEntry.rank !== '-' && (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800 ml-2">
-                          Currently #{latestEntry.rank}
+                      <div>
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                          {latestEntry.teams.division}
                         </span>
-                      )}
+                      </div>
+                      <div className="flex gap-2">
+                        {latestEntry.overallRank !== '-' && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
+                            #{latestEntry.overallRank} Overall
+                          </span>
+                        )}
+                        {latestEntry.divisionRank !== '-' && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800">
+                            #{latestEntry.divisionRank} in {latestEntry.teams.division}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
