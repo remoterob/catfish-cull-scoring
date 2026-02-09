@@ -439,19 +439,6 @@ export default function TeamManagement() {
               </div>
             )}
           </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredTeams.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
-                    No teams found. Click "Add Team" to create one.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
         </div>
       </div>
 
