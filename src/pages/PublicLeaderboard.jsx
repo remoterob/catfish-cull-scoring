@@ -24,10 +24,19 @@ export default function PublicLeaderboard() {
         .order('catfish_count', { ascending: false })
 
       if (error) throw error
-      setCatches(data || [])
+
+      // Build team_names from competitor fields
+      const dataWithNames = (data || []).map(c => ({
+        ...c,
+        team_names: [c.competitor1_name, c.competitor2_name, c.competitor3_name]
+          .filter(Boolean)
+          .join(' & ')
+      }))
+
+      setCatches(dataWithNames)
       
       // Get prize fish
-      const eligible = data?.filter(c => c.eligible && c.status !== 'disqualified') || []
+      const eligible = dataWithNames?.filter(c => c.eligible && c.status !== 'disqualified') || []
       
       const heaviest = eligible
         .filter(c => c.heaviest_fish_grams)
@@ -66,10 +75,10 @@ export default function PublicLeaderboard() {
         const isEligible = !latestData.teams.competitor3_name || latestData.teams.competitor3_name.trim() === ''
         
         // Find this team's overall ranking (only if eligible)
-        const overallRank = isEligible ? data?.findIndex(c => c.team_id === latestData.team_id) + 1 : null
+        const overallRank = isEligible ? dataWithNames?.findIndex(c => c.team_id === latestData.team_id) + 1 : null
         
         // Find this team's division ranking (only if eligible)
-        const divisionTeams = data?.filter(c => c.division === latestData.teams.division) || []
+        const divisionTeams = dataWithNames?.filter(c => c.division === latestData.teams.division) || []
         const divisionRank = isEligible ? divisionTeams.findIndex(c => c.team_id === latestData.team_id) + 1 : null
         
         setLatestEntry({
@@ -155,29 +164,32 @@ export default function PublicLeaderboard() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-2xl p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-6">
-              <img src={SNZ_LOGO} alt="Spearfishing New Zealand" className="h-32 object-contain" />
+          {/* Mobile: stacked layout. Desktop: side by side */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            
+            {/* Left: SNZ Logo + Title */}
+            <div className="flex items-center gap-4">
+              <img src={SNZ_LOGO} alt="Spearfishing New Zealand" className="h-16 md:h-32 w-auto object-contain flex-shrink-0" />
               <div>
-                <h1 className="text-4xl font-bold text-blue-900">🏆 Catfish Cull 2026</h1>
-                <p className="text-xl text-gray-600">Live Results</p>
+                <h1 className="text-3xl md:text-4xl font-bold text-blue-900">🏆 Catfish Cull 2026</h1>
+                <p className="text-lg md:text-xl text-gray-600">Live Results</p>
               </div>
             </div>
-            
-            {/* Sponsor - Top Right */}
-            <div className="text-center">
-              <p className="text-base text-gray-500 uppercase tracking-wide mb-3 font-semibold">Proudly Sponsored By</p>
+
+            {/* Right: Sponsor - below on mobile, right on desktop */}
+            <div className="flex flex-row md:flex-col items-center gap-3 md:gap-2 md:text-center border-t md:border-t-0 pt-4 md:pt-0">
+              <p className="text-sm text-gray-500 uppercase tracking-wide font-semibold whitespace-nowrap">Proudly Sponsored By</p>
               <img 
                 src={SPONSOR_LOGO} 
                 alt="Hunting & Fishing Taupo" 
-                className="h-32 object-contain"
+                className="h-14 md:h-32 w-auto object-contain"
               />
             </div>
           </div>
 
           {/* Provisional Warning */}
           {eventState?.status === 'provisional' && (
-            <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
+            <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mt-4">
               <div className="flex items-center gap-2 text-yellow-800">
                 <Clock className="w-5 h-5" />
                 <div>
