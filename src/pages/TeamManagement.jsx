@@ -18,7 +18,8 @@ export default function TeamManagement() {
 
   const [formData, setFormData] = useState({
     team_number: '',
-    division: 'Open',
+    is_junior: false,
+    is_women: false,
     competitor1_name: '',
     competitor1_email: '',
     competitor2_name: '',
@@ -98,7 +99,8 @@ export default function TeamManagement() {
   const resetForm = () => {
     setFormData({
       team_number: '',
-      division: 'Open',
+      is_junior: false,
+      is_women: false,
       competitor1_name: '',
       competitor1_email: '',
       competitor2_name: '',
@@ -150,9 +152,19 @@ export default function TeamManagement() {
       for (const row of rows) {
         try {
           // Map CSV columns to database fields
+          // Handle both old format (Division) and new format (Is Junior, Is Women)
+          const isJunior = row['Is Junior']?.toLowerCase() === 'true' || 
+                          row['Is Junior']?.toLowerCase() === 'yes' ||
+                          row['Division']?.toLowerCase() === 'juniors'
+          
+          const isWomen = row['Is Women']?.toLowerCase() === 'true' || 
+                         row['Is Women']?.toLowerCase() === 'yes' ||
+                         row['Division']?.toLowerCase() === 'women'
+          
           const teamData = {
             team_number: parseInt(row['Team Number']) || 0,
-            division: row['Division'] || 'Open',
+            is_junior: isJunior,
+            is_women: isWomen,
             competitor1_name: row['Competitor 1 Name'] || '',
             competitor1_email: row['Competitor 1 Email'] || '',
             competitor2_name: row['Competitor 2 Name'] || '',
@@ -200,7 +212,12 @@ export default function TeamManagement() {
   }
 
   const filteredTeams = teams
-    .filter(t => filterDivision === 'All' || t.division === filterDivision)
+    .filter(t => {
+      if (filterDivision === 'All') return true // All = everyone
+      if (filterDivision === 'Juniors') return t.is_junior
+      if (filterDivision === 'Women') return t.is_women
+      return true
+    })
     .filter(t => 
       searchTerm === '' ||
       t.team_number.toString().includes(searchTerm) ||
@@ -253,7 +270,6 @@ export default function TeamManagement() {
               className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option>All</option>
-              <option>Open</option>
               <option>Women</option>
               <option>Juniors</option>
             </select>
@@ -356,7 +372,23 @@ export default function TeamManagement() {
                 {filteredTeams.map((team) => (
                   <tr key={team.id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-3 font-bold whitespace-nowrap">#{team.team_number}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{team.division}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-1">
+                        <span className="inline-block px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">
+                          Open
+                        </span>
+                        {team.is_junior && (
+                          <span className="inline-block px-2 py-1 text-xs rounded bg-purple-100 text-purple-800">
+                            Juniors
+                          </span>
+                        )}
+                        {team.is_women && (
+                          <span className="inline-block px-2 py-1 text-xs rounded bg-pink-100 text-pink-800">
+                            Women
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="text-sm">
                         <div>{team.competitor1_name} & {team.competitor2_name}</div>
@@ -408,7 +440,21 @@ export default function TeamManagement() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <div className="font-bold text-lg">Team #{team.team_number}</div>
-                        <div className="text-sm text-gray-600">{team.division}</div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <span className="inline-block px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">
+                            Open
+                          </span>
+                          {team.is_junior && (
+                            <span className="inline-block px-2 py-1 text-xs rounded bg-purple-100 text-purple-800">
+                              Juniors
+                            </span>
+                          )}
+                          {team.is_women && (
+                            <span className="inline-block px-2 py-1 text-xs rounded bg-pink-100 text-pink-800">
+                              Women
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -464,17 +510,30 @@ export default function TeamManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-1">Division *</label>
-                  <select
-                    required
-                    value={formData.division}
-                    onChange={(e) => setFormData({...formData, division: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  >
-                    <option>Open</option>
-                    <option>Women</option>
-                    <option>Juniors</option>
-                  </select>
+                  <label className="block text-sm font-semibold mb-2">Categories</label>
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600 mb-2">
+                      ✓ All teams compete in <strong>Open</strong>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_junior}
+                        onChange={(e) => setFormData({...formData, is_junior: e.target.checked})}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">Also compete in Juniors</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_women}
+                        onChange={(e) => setFormData({...formData, is_women: e.target.checked})}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">Also compete in Women</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 

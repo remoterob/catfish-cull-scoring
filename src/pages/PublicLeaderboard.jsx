@@ -62,15 +62,19 @@ export default function PublicLeaderboard() {
         .single()
 
       if (!latestError && latestData) {
-        // Find this team's overall ranking
-        const overallRank = data?.findIndex(c => c.team_id === latestData.team_id) + 1
+        // Check if team is eligible (2 people only)
+        const isEligible = !latestData.teams.competitor3_name || latestData.teams.competitor3_name.trim() === ''
         
-        // Find this team's division ranking
+        // Find this team's overall ranking (only if eligible)
+        const overallRank = isEligible ? data?.findIndex(c => c.team_id === latestData.team_id) + 1 : null
+        
+        // Find this team's division ranking (only if eligible)
         const divisionTeams = data?.filter(c => c.division === latestData.teams.division) || []
-        const divisionRank = divisionTeams.findIndex(c => c.team_id === latestData.team_id) + 1
+        const divisionRank = isEligible ? divisionTeams.findIndex(c => c.team_id === latestData.team_id) + 1 : null
         
         setLatestEntry({
           ...latestData,
+          eligible: isEligible,
           overallRank: overallRank || '-',
           divisionRank: divisionRank || '-'
         })
@@ -99,28 +103,25 @@ export default function PublicLeaderboard() {
     fetchLeaderboard()
     fetchEventState()
 
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('leaderboard-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'catches' },
-        () => fetchLeaderboard()
-      )
-      .subscribe()
-
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(fetchLeaderboard, 10000)
+    // Auto-refresh every 10 seconds (no real-time subscriptions for better scalability)
+    const interval = setInterval(() => {
+      fetchLeaderboard()
+      fetchEventState()
+    }, 10000)
 
     return () => {
-      supabase.removeChannel(channel)
       clearInterval(interval)
     }
   }, [])
 
-  // Filter by division
+  // Filter by category
   const filteredCatches = selectedDivision === 'All'
-    ? catches
-    : catches.filter(c => c.division === selectedDivision)
+    ? catches // All = Open category (everyone)
+    : selectedDivision === 'Juniors'
+    ? catches.filter(c => c.is_junior)
+    : selectedDivision === 'Women'
+    ? catches.filter(c => c.is_women)
+    : catches
 
   // Calculate rankings
   const rankedCatches = filteredCatches.map((c, index, arr) => {
@@ -156,7 +157,7 @@ export default function PublicLeaderboard() {
         <div className="bg-white rounded-lg shadow-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-6">
-              <img src={SNZ_LOGO} alt="Spearfishing New Zealand" className="h-16 object-contain" />
+              <img src={SNZ_LOGO} alt="Spearfishing New Zealand" className="h-32 object-contain" />
               <div>
                 <h1 className="text-4xl font-bold text-blue-900">🏆 Catfish Cull 2026</h1>
                 <p className="text-xl text-gray-600">Live Results</p>
@@ -165,11 +166,11 @@ export default function PublicLeaderboard() {
             
             {/* Sponsor - Top Right */}
             <div className="text-center">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Proudly Sponsored By</p>
+              <p className="text-base text-gray-500 uppercase tracking-wide mb-3 font-semibold">Proudly Sponsored By</p>
               <img 
                 src={SPONSOR_LOGO} 
                 alt="Hunting & Fishing Taupo" 
-                className="h-16 object-contain"
+                className="h-32 object-contain"
               />
             </div>
           </div>
@@ -194,7 +195,7 @@ export default function PublicLeaderboard() {
         {/* Division Tabs */}
         <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
           <div className="flex gap-2 flex-wrap">
-            {['All', 'Open', 'Women', 'Juniors'].map(div => (
+            {['All', 'Women', 'Juniors'].map(div => (
               <button
                 key={div}
                 onClick={() => setSelectedDivision(div)}
@@ -360,23 +361,34 @@ export default function PublicLeaderboard() {
                       <p className="text-sm text-green-700">Catfish</p>
                     </div>
                     <div className="space-y-2">
-                      <div>
+                      <div className="flex flex-wrap gap-1">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
-                          {latestEntry.teams.division}
+                          Open
                         </span>
+                        {latestEntry.teams.is_junior && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800">
+                            Juniors
+                          </span>
+                        )}
+                        {latestEntry.teams.is_women && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-pink-100 text-pink-800">
+                            Women
+                          </span>
+                        )}
                       </div>
-                      <div className="flex gap-2">
-                        {latestEntry.overallRank !== '-' && (
+                      {latestEntry.eligible ? (
+                        <div className="flex gap-2 flex-wrap">
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
                             #{latestEntry.overallRank} Overall
                           </span>
-                        )}
-                        {latestEntry.divisionRank !== '-' && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800">
-                            #{latestEntry.divisionRank} in {latestEntry.teams.division}
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-700">
+                            ⚠️ Ineligible for Prizes
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
