@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Trophy, Clock, TrendingUp } from 'lucide-react'
+import { Clock, TrendingUp } from 'lucide-react'
 
-// Logo URLs from environment variables or placeholders
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
 const SPONSOR_LOGO = import.meta.env.VITE_SPONSOR_LOGO_URL || '/api/placeholder/300/120'
 
@@ -14,8 +13,8 @@ export default function PublicLeaderboard() {
   const [lightestFish, setLightestFish] = useState(null)
   const [loading, setLoading] = useState(true)
   const [latestEntry, setLatestEntry] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(new Date())
 
-  // Fetch leaderboard data
   const fetchLeaderboard = async () => {
     try {
       const { data, error } = await supabase
@@ -25,7 +24,6 @@ export default function PublicLeaderboard() {
 
       if (error) throw error
 
-      // Build team_names from competitor fields
       const dataWithNames = (data || []).map(c => ({
         ...c,
         team_names: [c.competitor1_name, c.competitor2_name, c.competitor3_name]
@@ -34,22 +32,20 @@ export default function PublicLeaderboard() {
       }))
 
       setCatches(dataWithNames)
-      
-      // Get prize fish
+
       const eligible = dataWithNames?.filter(c => c.eligible && c.status !== 'disqualified') || []
-      
+
       const heaviest = eligible
         .filter(c => c.heaviest_fish_grams)
         .sort((a, b) => b.heaviest_fish_grams - a.heaviest_fish_grams)[0]
-      
+
       const lightest = eligible
         .filter(c => c.lightest_fish_grams)
         .sort((a, b) => a.lightest_fish_grams - b.lightest_fish_grams)[0]
-      
+
       setHeaviestFish(heaviest || null)
       setLightestFish(lightest || null)
 
-      // Get latest entry (with or without photo)
       const { data: latestData, error: latestError } = await supabase
         .from('catches')
         .select(`
@@ -63,6 +59,8 @@ export default function PublicLeaderboard() {
             competitor1_name,
             competitor2_name,
             competitor3_name,
+            is_junior,
+            is_women,
             division
           )
         `)
@@ -71,16 +69,10 @@ export default function PublicLeaderboard() {
         .single()
 
       if (!latestError && latestData) {
-        // Check if team is eligible (2 people only)
         const isEligible = !latestData.teams.competitor3_name || latestData.teams.competitor3_name.trim() === ''
-        
-        // Find this team's overall ranking (only if eligible)
         const overallRank = isEligible ? dataWithNames?.findIndex(c => c.team_id === latestData.team_id) + 1 : null
-        
-        // Find this team's division ranking (only if eligible)
         const divisionTeams = dataWithNames?.filter(c => c.division === latestData.teams.division) || []
         const divisionRank = isEligible ? divisionTeams.findIndex(c => c.team_id === latestData.team_id) + 1 : null
-        
         setLatestEntry({
           ...latestData,
           eligible: isEligible,
@@ -91,6 +83,7 @@ export default function PublicLeaderboard() {
         setLatestEntry(null)
       }
 
+      setLastUpdated(new Date())
       setLoading(false)
     } catch (error) {
       console.error('Error fetching leaderboard:', error)
@@ -98,55 +91,37 @@ export default function PublicLeaderboard() {
     }
   }
 
-  // Fetch event state
   const fetchEventState = async () => {
-    const { data } = await supabase
-      .from('event_state')
-      .select('*')
-      .single()
-    
+    const { data } = await supabase.from('event_state').select('*').single()
     setEventState(data)
   }
 
   useEffect(() => {
     fetchLeaderboard()
     fetchEventState()
-
-    // Auto-refresh every 10 seconds (no real-time subscriptions for better scalability)
     const interval = setInterval(() => {
       fetchLeaderboard()
       fetchEventState()
     }, 10000)
-
-    return () => {
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
   }, [])
 
-  // Filter by category
   const filteredCatches = selectedDivision === 'All'
-    ? catches // All = Open category (everyone)
+    ? catches
     : selectedDivision === 'Juniors'
     ? catches.filter(c => c.is_junior)
     : selectedDivision === 'Women'
     ? catches.filter(c => c.is_women)
     : catches
 
-  // Calculate rankings
   const rankedCatches = filteredCatches.map((c, index, arr) => {
-    if (!c.eligible || c.status === 'disqualified') {
-      return { ...c, rank: '-' }
-    }
-    
-    // Find rank among eligible teams
+    if (!c.eligible || c.status === 'disqualified') return { ...c, rank: '-' }
     const eligibleAbove = arr
       .slice(0, index)
       .filter(x => x.eligible && x.status !== 'disqualified' && x.catfish_count > c.catfish_count)
-    
     return { ...c, rank: eligibleAbove.length + 1 }
   })
 
-  // Stats
   const totalTeams = catches.length
   const totalCatfish = catches.reduce((sum, c) => sum + c.catfish_count, 0)
   const avgCatfish = totalTeams > 0 ? (totalCatfish / totalTeams).toFixed(1) : 0
@@ -162,40 +137,29 @@ export default function PublicLeaderboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-2xl p-6 mb-6">
-          {/* Mobile: stacked layout. Desktop: side by side */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            
-            {/* Left: SNZ Logo + Title */}
-            <div className="flex items-center gap-4">
-              <img src={SNZ_LOGO} alt="Spearfishing New Zealand" className="h-16 md:h-32 w-auto object-contain flex-shrink-0" />
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-blue-900">🏆 Catfish Cull 2026</h1>
-                <p className="text-lg md:text-xl text-gray-600">Live Results</p>
-              </div>
-            </div>
 
-            {/* Right: Sponsor - below on mobile, right on desktop */}
-            <div className="flex flex-row md:flex-col items-center gap-3 md:gap-2 md:text-center border-t md:border-t-0 pt-4 md:pt-0">
-              <p className="text-sm text-gray-500 uppercase tracking-wide font-semibold whitespace-nowrap">Proudly Sponsored By</p>
-              <img 
-                src={SPONSOR_LOGO} 
-                alt="Hunting & Fishing Taupo" 
-                className="h-14 md:h-32 w-auto object-contain"
-              />
+        {/* TITLE CARD — clean, no logos */}
+        <div className="bg-white rounded-lg shadow-2xl p-6 mb-4">
+          <div className="flex items-center gap-4">
+            <img
+              src={SNZ_LOGO}
+              alt="Spearfishing New Zealand"
+              className="h-16 md:h-20 w-auto object-contain flex-shrink-0"
+            />
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-blue-900">Catfish Cull 2026</h1>
+              <p className="text-lg text-gray-500">Live Results</p>
             </div>
           </div>
 
-          {/* Provisional Warning */}
           {eventState?.status === 'provisional' && (
             <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mt-4">
               <div className="flex items-center gap-2 text-yellow-800">
                 <Clock className="w-5 h-5" />
                 <div>
-                  <p className="font-semibold">⚠️ PROVISIONAL RESULTS</p>
+                  <p className="font-semibold">PROVISIONAL RESULTS</p>
                   <p className="text-sm">
-                    Protest period open until {eventState.protest_deadline}. 
+                    Protest period open until {eventState.protest_deadline}.
                     Final results at prizegiving: {eventState.prizegiving_time}
                   </p>
                 </div>
@@ -204,81 +168,88 @@ export default function PublicLeaderboard() {
           )}
         </div>
 
-        {/* Division Tabs */}
-        <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-          <div className="flex gap-2 flex-wrap">
-            {['All', 'Women', 'Juniors'].map(div => (
+        {/* SPONSOR CARD — its own card below title */}
+        <div className="bg-white rounded-lg shadow-lg px-6 py-4 mb-6 flex items-center gap-4">
+          <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold whitespace-nowrap">
+            Proudly Sponsored By
+          </p>
+          <img
+            src={SPONSOR_LOGO}
+            alt="Hunting & Fishing Taupo"
+            className="h-10 md:h-14 w-auto object-contain"
+          />
+        </div>
+
+        {/* CATEGORY TABS — 3-col grid, always fits on mobile */}
+        <div className="bg-white rounded-lg shadow-lg p-3 mb-6">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: 'All',     label: '🎯 All' },
+              { id: 'Women',   label: '👩 Women' },
+              { id: 'Juniors', label: '🧒 Juniors' },
+            ].map(({ id, label }) => (
               <button
-                key={div}
-                onClick={() => setSelectedDivision(div)}
-                className={`px-6 py-3 rounded-lg font-semibold transition ${
-                  selectedDivision === div
-                    ? 'bg-blue-600 text-white'
+                key={id}
+                onClick={() => setSelectedDivision(id)}
+                className={`py-3 rounded-lg font-semibold text-sm transition ${
+                  selectedDivision === id
+                    ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {div}
+                {label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Prize Fish Leaders */}
+        {/* PRIZE FISH — different icons for heavy vs light */}
         {(heaviestFish || lightestFish) && (
-          <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-2 gap-4 mb-6">
             {heaviestFish && (
-              <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-xl p-6 text-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="w-6 h-6" />
-                  <h3 className="text-xl font-bold">Heaviest Fish</h3>
+              <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-xl p-5 text-white">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl">⚖️</span>
+                  <h3 className="text-base font-bold">Heaviest Fish</h3>
                 </div>
                 <p className="text-3xl font-bold">{heaviestFish.heaviest_fish_grams}g</p>
-                <p className="text-lg">Team #{heaviestFish.team_number} - {heaviestFish.team_names}</p>
+                <p className="text-sm mt-1 opacity-90">Team #{heaviestFish.team_number}</p>
+                <p className="text-xs opacity-75 truncate">{heaviestFish.team_names}</p>
               </div>
             )}
-
             {lightestFish && (
-              <div className="bg-gradient-to-br from-green-400 to-teal-500 rounded-lg shadow-xl p-6 text-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="w-6 h-6" />
-                  <h3 className="text-xl font-bold">Lightest Fish</h3>
+              <div className="bg-gradient-to-br from-green-400 to-teal-500 rounded-lg shadow-xl p-5 text-white">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl">🪶</span>
+                  <h3 className="text-base font-bold">Lightest Fish</h3>
                 </div>
                 <p className="text-3xl font-bold">{lightestFish.lightest_fish_grams}g</p>
-                <p className="text-lg">Team #{lightestFish.team_number} - {lightestFish.team_names}</p>
+                <p className="text-sm mt-1 opacity-90">Team #{lightestFish.team_number}</p>
+                <p className="text-xs opacity-75 truncate">{lightestFish.team_names}</p>
               </div>
             )}
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center gap-2 text-blue-600 mb-2">
-              <TrendingUp className="w-5 h-5" />
-              <h3 className="font-semibold">Total Teams</h3>
+        {/* STATS */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {[
+            { label: 'Teams', value: totalTeams },
+            { label: 'Catfish', value: totalCatfish },
+            { label: 'Average', value: avgCatfish },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-white rounded-lg shadow-lg p-4">
+              <div className="flex items-center gap-1 text-blue-600 mb-1">
+                <TrendingUp className="w-4 h-4" />
+                <h3 className="font-semibold text-xs md:text-sm">{label}</h3>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">{value}</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{totalTeams}</p>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center gap-2 text-blue-600 mb-2">
-              <TrendingUp className="w-5 h-5" />
-              <h3 className="font-semibold">Total Catfish</h3>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{totalCatfish}</p>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center gap-2 text-blue-600 mb-2">
-              <TrendingUp className="w-5 h-5" />
-              <h3 className="font-semibold">Average</h3>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{avgCatfish}</p>
-          </div>
+          ))}
         </div>
 
-        {/* Leaderboard */}
-        <div className="bg-white rounded-lg shadow-2xl overflow-hidden mb-6">
+        {/* LEADERBOARD — table on desktop */}
+        <div className="hidden md:block bg-white rounded-lg shadow-2xl overflow-hidden mb-6">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-blue-600 text-white">
@@ -286,7 +257,7 @@ export default function PublicLeaderboard() {
                   <th className="px-4 py-3 text-left">Rank</th>
                   <th className="px-4 py-3 text-left">Team #</th>
                   <th className="px-4 py-3 text-left">Team</th>
-                  <th className="px-4 py-3 text-left">Division</th>
+                  <th className="px-4 py-3 text-left">Categories</th>
                   <th className="px-4 py-3 text-center">Catfish</th>
                   <th className="px-4 py-3 text-left">Status</th>
                 </tr>
@@ -298,26 +269,26 @@ export default function PublicLeaderboard() {
                     className={`border-b ${
                       !c.eligible || c.status === 'disqualified'
                         ? 'bg-gray-100 text-gray-500'
-                        : index % 2 === 0
-                        ? 'bg-white'
-                        : 'bg-blue-50'
+                        : index % 2 === 0 ? 'bg-white' : 'bg-blue-50'
                     }`}
                   >
-                    <td className="px-4 py-3 font-bold">{c.rank}</td>
-                    <td className="px-4 py-3">#{c.team_number}</td>
+                    <td className="px-4 py-3 font-bold text-lg">
+                      {c.rank === 1 ? '🥇' : c.rank === 2 ? '🥈' : c.rank === 3 ? '🥉' : c.rank}
+                    </td>
+                    <td className="px-4 py-3 font-medium">#{c.team_number}</td>
                     <td className="px-4 py-3">{c.team_names}</td>
-                    <td className="px-4 py-3">{c.division}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
+                        {c.is_junior && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Juniors</span>}
+                        {c.is_women && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800">Women</span>}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-center text-xl font-bold">{c.catfish_count}</td>
                     <td className="px-4 py-3">
-                      {c.status === 'under_protest' && (
-                        <span className="text-orange-600 font-semibold">Under Protest</span>
-                      )}
-                      {c.status === 'disqualified' && (
-                        <span className="text-red-600 font-semibold">Disqualified</span>
-                      )}
-                      {!c.eligible && c.status === 'provisional' && (
-                        <span className="text-gray-500 text-sm">Ineligible (3-person)</span>
-                      )}
+                      {c.status === 'under_protest' && <span className="text-orange-600 font-semibold text-sm">Under Protest</span>}
+                      {c.status === 'disqualified' && <span className="text-red-600 font-semibold text-sm">Disqualified</span>}
+                      {!c.eligible && <span className="text-gray-500 text-sm">⚠️ Ineligible</span>}
                     </td>
                   </tr>
                 ))}
@@ -333,85 +304,127 @@ export default function PublicLeaderboard() {
           </div>
         </div>
 
-        {/* Footer - Latest Entry */}
-        <div className="text-center mt-6">
-          {latestEntry && (
-            <div className="bg-white rounded-lg shadow-2xl p-6 mb-4">
-              <h3 className="text-sm text-gray-500 uppercase tracking-wide mb-4">🔥 Latest Entry</h3>
-              <div className="flex items-center justify-center gap-6 max-w-2xl mx-auto">
-                {/* Photo or Placeholder */}
+        {/* LEADERBOARD — cards on mobile */}
+        <div className="md:hidden space-y-3 mb-6">
+          {rankedCatches.length === 0 && (
+            <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
+              No scores yet. First team to weigh in will appear here!
+            </div>
+          )}
+          {rankedCatches.map((c) => (
+            <div
+              key={c.id}
+              className={`bg-white rounded-lg shadow-lg overflow-hidden ${
+                !c.eligible || c.status === 'disqualified' ? 'opacity-60' : ''
+              }`}
+            >
+              {/* Colour strip for top 3 */}
+              <div className={`h-1.5 ${
+                c.rank === 1 ? 'bg-yellow-400' :
+                c.rank === 2 ? 'bg-gray-300' :
+                c.rank === 3 ? 'bg-amber-600' :
+                'bg-blue-100'
+              }`} />
+              <div className="p-4 flex items-center gap-3">
+                {/* Rank */}
+                <div className="text-xl font-black text-blue-900 w-9 text-center flex-shrink-0">
+                  {c.rank === 1 ? '🥇' : c.rank === 2 ? '🥈' : c.rank === 3 ? '🥉' : c.rank === '-' ? '—' : `#${c.rank}`}
+                </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                    <span className="font-bold text-gray-900 text-sm">#{c.team_number}</span>
+                    <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
+                    {c.is_junior && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">Jr</span>}
+                    {c.is_women && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-pink-100 text-pink-800">W</span>}
+                  </div>
+                  <p className="text-sm text-gray-600 truncate">{c.team_names}</p>
+                  {!c.eligible && <p className="text-xs text-orange-500 mt-0.5">⚠️ Ineligible for prizes</p>}
+                  {c.status === 'under_protest' && <p className="text-xs text-orange-600 mt-0.5">Under Protest</p>}
+                  {c.status === 'disqualified' && <p className="text-xs text-red-600 mt-0.5">Disqualified</p>}
+                </div>
+                {/* Catfish count */}
+                <div className="text-right flex-shrink-0">
+                  <p className="text-3xl font-black text-blue-900 leading-none">{c.catfish_count}</p>
+                  <p className="text-xs text-gray-400">catfish</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* LATEST ENTRY — left-aligned header, consistent with other cards */}
+        {latestEntry && (
+          <div className="bg-white rounded-lg shadow-2xl overflow-hidden mb-4">
+            <div className="px-6 pt-5 pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔥</span>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Latest Entry</h3>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-5">
+                {/* Photo */}
                 <div className="flex-shrink-0">
                   {latestEntry.photo_urls && latestEntry.photo_urls.length > 0 ? (
-                    <img 
-                      src={latestEntry.photo_urls[0]} 
-                      alt="Latest catch" 
-                      className="w-32 h-32 object-cover rounded-lg border-4 border-green-400 shadow-xl"
+                    <img
+                      src={latestEntry.photo_urls[0]}
+                      alt="Latest catch"
+                      className="w-28 h-28 object-cover rounded-lg border-4 border-green-400 shadow-xl"
                     />
                   ) : (
-                    <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg border-4 border-gray-300 shadow-xl flex items-center justify-center">
+                    <div className="w-28 h-28 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg border-4 border-gray-300 shadow-xl flex items-center justify-center">
                       <div className="text-center">
-                        <div className="text-4xl mb-1">🎣</div>
+                        <div className="text-3xl mb-1">🎣</div>
                         <p className="text-xs text-gray-600">No photo</p>
                       </div>
                     </div>
                   )}
                 </div>
                 {/* Info */}
-                <div className="flex-1 text-left">
-                  <div className="mb-3">
-                    <p className="text-3xl font-bold text-gray-900">
-                      Team #{latestEntry.teams.team_number}
-                    </p>
-                    <p className="text-lg text-gray-600">
-                      {latestEntry.teams.competitor1_name} & {latestEntry.teams.competitor2_name}
-                      {latestEntry.teams.competitor3_name && ` & ${latestEntry.teams.competitor3_name}`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-2xl font-bold text-gray-900">Team #{latestEntry.teams.team_number}</p>
+                  <p className="text-sm text-gray-600 mb-3 truncate">
+                    {latestEntry.teams.competitor1_name} & {latestEntry.teams.competitor2_name}
+                    {latestEntry.teams.competitor3_name && ` & ${latestEntry.teams.competitor3_name}`}
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
                     <div className="bg-green-100 px-4 py-2 rounded-lg">
-                      <p className="text-4xl font-bold text-green-600">{latestEntry.catfish_count}</p>
-                      <p className="text-sm text-green-700">Catfish</p>
+                      <p className="text-3xl font-bold text-green-600 leading-none">{latestEntry.catfish_count}</p>
+                      <p className="text-xs text-green-700">Catfish</p>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex flex-wrap gap-1">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
-                          Open
-                        </span>
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
                         {latestEntry.teams.is_junior && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800">
-                            Juniors
-                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Juniors</span>
                         )}
                         {latestEntry.teams.is_women && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-pink-100 text-pink-800">
-                            Women
-                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-800">Women</span>
                         )}
                       </div>
                       {latestEntry.eligible ? (
-                        <div className="flex gap-2 flex-wrap">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
-                            #{latestEntry.overallRank} Overall
-                          </span>
-                        </div>
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                          #{latestEntry.overallRank} Overall
+                        </span>
                       ) : (
-                        <div>
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-700">
-                            ⚠️ Ineligible for Prizes
-                          </span>
-                        </div>
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                          ⚠️ Ineligible for Prizes
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          )}
-          
-          <div className="text-white">
-            <p className="text-sm">Auto-refreshes every 10 seconds • Last updated: {new Date().toLocaleTimeString()}</p>
           </div>
-        </div>
+        )}
+
+        {/* Footer */}
+        <p className="text-center text-white text-sm pb-6 opacity-75">
+          Auto-refreshes every 10 seconds • Last updated: {lastUpdated.toLocaleTimeString()}
+        </p>
+
       </div>
     </div>
   )
