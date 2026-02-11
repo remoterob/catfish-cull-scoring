@@ -13,6 +13,7 @@ export default function PublicLeaderboard() {
   const [lightestFish, setLightestFish] = useState(null)
   const [loading, setLoading] = useState(true)
   const [latestEntry, setLatestEntry] = useState(null)
+  const [allTeams, setAllTeams] = useState([])
   const [lastUpdated, setLastUpdated] = useState(new Date())
 
   const fetchLeaderboard = async () => {
@@ -96,12 +97,21 @@ export default function PublicLeaderboard() {
     setEventState(data)
   }
 
+  const fetchAllTeams = async () => {
+    const { data } = await supabase
+      .from('teams')
+      .select('id, is_junior, is_women, competitor3_name')
+    setAllTeams(data || [])
+  }
+
   useEffect(() => {
     fetchLeaderboard()
     fetchEventState()
+    fetchAllTeams()
     const interval = setInterval(() => {
       fetchLeaderboard()
       fetchEventState()
+      fetchAllTeams()
     }, 10000)
     return () => clearInterval(interval)
   }, [])
@@ -200,6 +210,51 @@ export default function PublicLeaderboard() {
                 {label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* STATS PANEL */}
+        <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+            {/* Total Teams */}
+            <div className="bg-blue-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-black text-blue-700">{allTeams.length}</div>
+              <div className="text-xs text-blue-600 font-semibold uppercase tracking-wide mt-0.5">Total Teams</div>
+            </div>
+
+            {/* Scores Submitted */}
+            <div className="bg-green-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-black text-green-700">{catches.length}</div>
+              <div className="text-xs text-green-600 font-semibold uppercase tracking-wide mt-0.5">Scores In</div>
+            </div>
+
+            {/* Women's teams */}
+            <div className="bg-pink-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-black text-pink-700">
+                {allTeams.filter(t => t.is_women).length}
+              </div>
+              <div className="text-xs text-pink-600 font-semibold uppercase tracking-wide mt-0.5">Women's Teams</div>
+            </div>
+
+            {/* Junior teams */}
+            <div className="bg-purple-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-black text-purple-700">
+                {allTeams.filter(t => t.is_junior).length}
+              </div>
+              <div className="text-xs text-purple-600 font-semibold uppercase tracking-wide mt-0.5">Junior Teams</div>
+            </div>
+
+          </div>
+
+          {/* Catfish eradicated — full width highlight */}
+          <div className="mt-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg p-4 text-center text-white">
+            <div className="text-4xl font-black tracking-tight">
+              {catches.reduce((sum, c) => sum + (c.catfish_count || 0), 0).toLocaleString()}
+            </div>
+            <div className="text-sm font-semibold uppercase tracking-widest mt-0.5 opacity-90">
+              🐟 Catfish Eradicated
+            </div>
           </div>
         </div>
 
