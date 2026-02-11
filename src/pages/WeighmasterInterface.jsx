@@ -18,6 +18,7 @@ export default function WeighmasterInterface() {
   const [lightestFish, setLightestFish] = useState('')
   const [photos, setPhotos] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [existingCatch, setExistingCatch] = useState(null)
   const [isEditMode, setIsEditMode] = useState(false)
 
@@ -212,6 +213,48 @@ export default function WeighmasterInterface() {
       alert('Error submitting score: ' + error.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+
+  const handleDeleteCatch = async () => {
+    if (!existingCatch) return
+
+    const teamLabel = `Team #${selectedTeam.team_number} (${selectedTeam.competitor1_name}${selectedTeam.competitor2_name ? ' & ' + selectedTeam.competitor2_name : ''})`
+
+    const confirmed = window.confirm(
+      `⚠️ DELETE CATCH — Are you sure?\n\n${teamLabel}\nCatfish count: ${catfishCount}\n\nThis will permanently remove their entire score entry. This cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('catches')
+        .delete()
+        .eq('id', existingCatch.id)
+
+      if (error) throw error
+
+      alert(`✅ Catch deleted for ${teamLabel}.`)
+
+      // Reset form
+      setTeamNumber('')
+      setSearchName('')
+      setSelectedTeam(null)
+      setCatfishCount('')
+      setHeaviestFish('')
+      setLightestFish('')
+      setPhotos([])
+      setShowSearchResults(false)
+      setExistingCatch(null)
+      setIsEditMode(false)
+    } catch (error) {
+      console.error('Error deleting catch:', error)
+      alert('Error deleting catch: ' + error.message)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -437,7 +480,7 @@ export default function WeighmasterInterface() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={!selectedTeam || !catfishCount || submitting}
+              disabled={!selectedTeam || !catfishCount || submitting || deleting}
               className={`w-full py-4 rounded-lg text-xl font-bold disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
                 isEditMode 
                   ? 'bg-orange-600 hover:bg-orange-700 text-white' 
@@ -453,6 +496,25 @@ export default function WeighmasterInterface() {
                 </>
               )}
             </button>
+
+            {/* Delete Button — only shown in edit mode */}
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={handleDeleteCatch}
+                disabled={deleting || submitting}
+                className="w-full py-3 rounded-lg text-base font-bold border-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              >
+                {deleting ? (
+                  'Deleting...'
+                ) : (
+                  <>
+                    <span className="text-lg">🗑️</span>
+                    Delete This Catch Entry
+                  </>
+                )}
+              </button>
+            )}
           </form>
         </div>
 
@@ -463,6 +525,7 @@ export default function WeighmasterInterface() {
             <li>• Search works with partial names (e.g., "John" finds "John Smith")</li>
             <li>• If a team already has a score, it will load automatically for editing</li>
             <li>• Edit mode shows an orange warning - make changes and submit to update</li>
+            <li>• In edit mode, use "Delete This Catch Entry" to fully remove a score</li>
             <li>• Catfish count is required, prize fish weights are optional</li>
             <li>• Photos are optional but recommended for verification</li>
             <li>• Emails are sent automatically for new scores (not for updates)</li>
