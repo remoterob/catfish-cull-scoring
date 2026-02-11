@@ -149,98 +149,243 @@ export default function TeamManagement() {
     setShowAddModal(true)
   }
 
-  const handleCSVImport = async (e) => {
+  // ── TryBooking Import ──────────────────────────────────────────────
+  const [importPreview, setImportPreview] = useState(null) // parsed teams awaiting review
+
+  const TSHIRT_COL = "Ticket Data: T Shirt Size (we Have Purchased A Few Spares For Late Bookings After 8th Of Feb But Sorry We Cannot Guarantee A Tshirt For Late Entries))"
+  const DIVISION_COL = "Ticket Data: Divisions You Are Entering."
+  const PARTNER_COL = "Ticket Data: Dive Partner"
+  const FNAME_COL = "Ticket Data: Competitor First Name"
+  const LNAME_COL = "Ticket Data: Competitor Last Name"
+  const EMAIL_COL = "Ticket Data: Competitors Email"
+  const TICKET_TYPE_COL = "Ticket Type"
+  const BOOKING_ID_COL = "Booking ID"
+
+  // Robust CSV parser that handles quoted fields with commas inside
+  const parseCSVRobust = (text) => {
+    const lines = []
+    let current = []
+    let field = ''
+    let inQuotes = false
+    // strip BOM
+    const raw = text.replace(/^\uFEFF/, '')
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i]
+      const next = raw[i + 1]
+      if (inQuotes) {
+        if (ch === '"' && next === '"') { field += '"'; i++ }
+        else if (ch === '"') { inQuotes = false }
+        else { field += ch }
+      } else {
+        if (ch === '"') { inQuotes = true }
+        else if (ch === ',') { current.push(field.trim()); field = '' }
+        else if (ch === '\n' || (ch === '\r' && next === '\n')) {
+          if (ch === '\r') i++
+          current.push(field.trim()); field = ''
+          if (current.some(v => v)) lines.push(current)
+          current = []
+        } else { field += ch }
+      }
+    }
+    if (field || current.length) { current.push(field.trim()); if (current.some(v => v)) lines.push(current) }
+    if (lines.length < 2) return []
+    const headers = lines[0]
+    return lines.slice(1).map(values => {
+      const row = {}
+      headers.forEach((h, i) => { row[h] = values[i] || '' })
+      return row
+    })
+  }
+
+  const normalizeName = (name) =>
+    name.trim().replace(/\s+/g, ' ')
+      .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+
+  // Fuzzy name match: exact → first-last swap → single word contained
+  const findCompetitor = (partnerRaw, byName) => {
+    const key = normalizeName(partnerRaw).toLowerCase()
+    if (!key) return null
+    // exact
+    if (byName[key]) return byName[key]
+    // try words — match if 2+ words overlap with a registered name
+    const queryWords = key.split(' ').filter(w => w.length > 1)
+    for (const [regKey, regRow] of Object.entries(byName)) {
+      const regWords = regKey.split(' ')
+      const overlap = queryWords.filter(w => regWords.includes(w))
+      if (overlap.length >= 2) return regRow
+      // single distinctive surname match when query is just one token
+      if (queryWords.length === 1 && regWords.includes(queryWords[0])) return regRow
+    }
+    return null
+  }
+
+  const parseDivisions = (divStr, ticketType) => {
+    const isJuniorTicket = ticketType.includes('Junior')
+    const isJuniorDiv = divStr.includes('Juniors') || isJuniorTicket
+    const isWomenDiv = divStr.includes('Women')
+    return { isJunior: isJuniorDiv, isWomen: isWomenDiv }
+  }
+
+  const handleTryBookingImport = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-
     setImporting(true)
     setImportResults(null)
+    setImportPreview(null)
 
     try {
       const text = await file.text()
-      const lines = text.split('\n').filter(line => line.trim())
-      
-      if (lines.length < 2) {
-        alert('CSV file is empty or invalid')
-        setImporting(false)
+      const rows = parseCSVRobust(text)
+
+      if (!rows.length || !rows[0][FNAME_COL]) {
+        // Fall back to legacy CSV format
+        handleLegacyCSVRows(rows, e)
         return
       }
 
-      // Parse CSV (simple parser - handles basic CSV)
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
-      const rows = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
-        const row = {}
-        headers.forEach((header, i) => {
-          row[header] = values[i] || ''
-        })
-        return row
-      })
-
-      let imported = 0
-      let errors = []
-
+      // Build lookup by normalised full name
+      const byName = {}
       for (const row of rows) {
-        try {
-          // Map CSV columns to database fields
-          // Handle both old format (Division) and new format (Is Junior, Is Women)
-          const isJunior = row['Is Junior']?.toLowerCase() === 'true' || 
-                          row['Is Junior']?.toLowerCase() === 'yes' ||
-                          row['Division']?.toLowerCase() === 'juniors'
-          
-          const isWomen = row['Is Women']?.toLowerCase() === 'true' || 
-                         row['Is Women']?.toLowerCase() === 'yes' ||
-                         row['Division']?.toLowerCase() === 'women'
-          
-          const teamData = {
-            team_number: parseInt(row['Team Number']) || 0,
-            is_junior: isJunior,
-            is_women: isWomen,
-            competitor1_name: row['Competitor 1 Name'] || '',
-            competitor1_email: row['Competitor 1 Email'] || '',
-            competitor2_name: row['Competitor 2 Name'] || '',
-            competitor2_email: row['Competitor 2 Email'] || '',
-            competitor3_name: row['Competitor 3 Name'] || '',
-            competitor3_email: row['Competitor 3 Email'] || '',
-            club: row['Club'] || '',
-            notes: row['Notes'] || ''
-          }
-
-          // Validate required fields
-          if (!teamData.team_number || !teamData.competitor1_name || !teamData.competitor2_name) {
-            errors.push(`Row ${imported + 1}: Missing required fields`)
-            continue
-          }
-
-          // Insert into database
-          const { error } = await supabase
-            .from('teams')
-            .insert([teamData])
-
-          if (error) {
-            errors.push(`Team ${teamData.team_number}: ${error.message}`)
-          } else {
-            imported++
-          }
-        } catch (err) {
-          errors.push(`Row ${imported + 1}: ${err.message}`)
-        }
+        const name = normalizeName(`${row[FNAME_COL]} ${row[LNAME_COL]}`).toLowerCase()
+        byName[name] = row
       }
 
-      setImportResults({
-        total: rows.length,
-        imported,
-        errors
-      })
+      const matched = new Set()
+      const teams = []
 
-      fetchTeams()
-    } catch (error) {
-      alert('Error reading CSV file: ' + error.message)
+      for (const row of rows) {
+        const name = normalizeName(`${row[FNAME_COL]} ${row[LNAME_COL]}`)
+        const nameKey = name.toLowerCase()
+        if (matched.has(nameKey)) continue
+
+        const partnerRaw = row[PARTNER_COL] || ''
+        const partnerRow = findCompetitor(partnerRaw, byName)
+        const partnerName = partnerRow
+          ? normalizeName(`${partnerRow[FNAME_COL]} ${partnerRow[LNAME_COL]}`)
+          : normalizeName(partnerRaw)
+
+        const { isJunior: c1Junior, isWomen: c1Women } = parseDivisions(row[DIVISION_COL] || '', row[TICKET_TYPE_COL] || '')
+        let isJunior = c1Junior
+        let isWomen = c1Women
+
+        let c2Email = '', c2Tshirt = '', c2Junior = false
+        if (partnerRow) {
+          const { isJunior: pj, isWomen: pw } = parseDivisions(partnerRow[DIVISION_COL] || '', partnerRow[TICKET_TYPE_COL] || '')
+          if (pj) isJunior = true
+          if (pw) isWomen = true
+          c2Email = partnerRow[EMAIL_COL] || ''
+          c2Tshirt = partnerRow[TSHIRT_COL] || ''
+          c2Junior = pj
+          matched.add(partnerName.toLowerCase())
+        }
+        matched.add(nameKey)
+
+        teams.push({
+          // competitors
+          competitor1_name: name,
+          competitor1_email: row[EMAIL_COL] || '',
+          competitor1_tshirt: row[TSHIRT_COL] || '',
+          competitor2_name: partnerName,
+          competitor2_email: c2Email,
+          competitor2_tshirt: c2Tshirt,
+          // flags
+          is_junior: isJunior,
+          is_women: isWomen,
+          // status
+          partnerFound: !!partnerRow,
+          partnerRaw,
+          bookingId: row[BOOKING_ID_COL] || '',
+          // editable team number (user assigns)
+          team_number: '',
+          // include in import
+          include: !!partnerRow,
+        })
+      }
+
+      // Sort: matched first, then unmatched
+      teams.sort((a, b) => (b.partnerFound ? 1 : 0) - (a.partnerFound ? 1 : 0))
+      setImportPreview(teams)
+    } catch (err) {
+      alert('Error reading file: ' + err.message)
     } finally {
       setImporting(false)
-      e.target.value = '' // Reset file input
+      e.target.value = ''
     }
   }
+
+  const handleLegacyCSVRows = async (rows, e) => {
+    let imported = 0
+    const errors = []
+    for (const row of rows) {
+      try {
+        const isJunior = row['Is Junior']?.toLowerCase() === 'true' || row['Is Junior']?.toLowerCase() === 'yes' || row['Division']?.toLowerCase() === 'juniors'
+        const isWomen  = row['Is Women']?.toLowerCase() === 'true'  || row['Is Women']?.toLowerCase() === 'yes'  || row['Division']?.toLowerCase() === 'women'
+        const teamData = {
+          team_number: parseInt(row['Team Number']) || 0,
+          is_junior: isJunior, is_women: isWomen,
+          competitor1_name: row['Competitor 1 Name'] || '', competitor1_email: row['Competitor 1 Email'] || '',
+          competitor2_name: row['Competitor 2 Name'] || '', competitor2_email: row['Competitor 2 Email'] || '',
+          competitor3_name: row['Competitor 3 Name'] || '', competitor3_email: row['Competitor 3 Email'] || '',
+          club: row['Club'] || '', notes: row['Notes'] || ''
+        }
+        if (!teamData.team_number || !teamData.competitor1_name || !teamData.competitor2_name) {
+          errors.push(`Row ${imported + 1}: Missing required fields`); continue
+        }
+        const { error } = await supabase.from('teams').insert([teamData])
+        if (error) errors.push(`Team ${teamData.team_number}: ${error.message}`)
+        else imported++
+      } catch (err) { errors.push(`Row ${imported + 1}: ${err.message}`) }
+    }
+    setImportResults({ total: rows.length, imported, errors })
+    fetchTeams()
+    setImporting(false)
+    if (e?.target) e.target.value = ''
+  }
+
+  const commitImport = async () => {
+    if (!importPreview) return
+    setImporting(true)
+    let imported = 0
+    const errors = []
+
+    const toImport = importPreview.filter(t => t.include)
+
+    // Validate all have team numbers
+    const missingNumbers = toImport.filter(t => !t.team_number || isNaN(parseInt(t.team_number)))
+    if (missingNumbers.length) {
+      alert(`Please assign team numbers to all ${missingNumbers.length} included teams before importing.`)
+      setImporting(false)
+      return
+    }
+
+    for (const team of toImport) {
+      try {
+        const teamData = {
+          team_number: parseInt(team.team_number),
+          is_junior: team.is_junior,
+          is_women: team.is_women,
+          competitor1_name: team.competitor1_name,
+          competitor1_email: team.competitor1_email,
+          tshirt1: team.competitor1_tshirt,
+          competitor2_name: team.competitor2_name,
+          competitor2_email: team.competitor2_email,
+          tshirt2: team.competitor2_tshirt,
+          registered: true,
+        }
+        const { error } = await supabase.from('teams').insert([teamData])
+        if (error) errors.push(`Team ${team.team_number} (${team.competitor1_name}): ${error.message}`)
+        else imported++
+      } catch (err) { errors.push(`${team.competitor1_name}: ${err.message}`) }
+    }
+
+    setImportResults({ total: toImport.length, imported, errors })
+    setImportPreview(null)
+    fetchTeams()
+    setImporting(false)
+  }
+
+  // Keep old handler name pointing to new one for the file input
+  const handleCSVImport = handleTryBookingImport
 
   const filteredTeams = teams
     .filter(t => {
@@ -322,7 +467,7 @@ export default function TeamManagement() {
                 }`}
               >
                 <Users className="w-5 h-5" />
-                {importing ? 'Importing...' : 'Import CSV'}
+                {importing ? 'Importing...' : 'Import TryBooking CSV'}
               </label>
             </div>
 
@@ -369,18 +514,11 @@ export default function TeamManagement() {
             </div>
           )}
 
-          {/* Template Download Link */}
+          {/* Import info */}
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>Need a template?</strong>{' '}
-              <a
-                href="/team-import-template.csv"
-                download
-                className="text-blue-600 hover:underline font-semibold"
-              >
-                Download CSV Template
-              </a>
-              {' '}with example data and correct column headers.
+              <strong>TryBooking export supported.</strong>{' '}
+              Export a Custom Report from TryBooking and import it directly — pairs are matched automatically by dive partner name. You'll get a preview to assign team numbers and fix any unmatched pairs before committing.
             </p>
           </div>
         </div>
@@ -826,6 +964,154 @@ export default function TeamManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── TryBooking Import Preview Modal ─────────────────────────── */}
+      {importPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl my-6">
+            {/* Header */}
+            <div className="bg-blue-700 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">TryBooking Import Preview</h2>
+                <p className="text-blue-200 text-sm mt-0.5">
+                  Review pairs, assign team numbers, then click Confirm Import
+                </p>
+              </div>
+              <div className="text-right text-sm">
+                <div className="text-white font-semibold">{importPreview.filter(t => t.partnerFound).length} paired</div>
+                <div className="text-yellow-300">{importPreview.filter(t => !t.partnerFound).length} need review</div>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="px-6 py-3 bg-gray-50 border-b flex flex-wrap gap-4 text-xs text-gray-600">
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500 inline-block"></span> Partner matched</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Partner not found — review before importing</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Women's division</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-500 inline-block"></span> Juniors division</span>
+            </div>
+
+            {/* Team rows */}
+            <div className="divide-y max-h-[60vh] overflow-y-auto">
+              {importPreview.map((team, idx) => (
+                <div
+                  key={idx}
+                  className={`px-4 py-3 ${!team.include ? 'opacity-40' : ''} ${!team.partnerFound ? 'bg-yellow-50' : ''}`}
+                >
+                  <div className="flex flex-wrap items-start gap-3">
+                    {/* Include toggle */}
+                    <label className="flex items-center gap-1.5 pt-1 cursor-pointer flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={!!team.include}
+                        onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, include: e.target.checked} : t))}
+                        className="w-4 h-4 accent-blue-600"
+                      />
+                      <span className="text-xs text-gray-500">Include</span>
+                    </label>
+
+                    {/* Team number */}
+                    <div className="flex-shrink-0">
+                      <label className="text-xs text-gray-500 block mb-0.5">Team #</label>
+                      <input
+                        type="number"
+                        placeholder="##"
+                        value={team.team_number}
+                        onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, team_number: e.target.value} : t))}
+                        className="w-16 px-2 py-1 border-2 border-blue-300 rounded text-sm font-bold text-center focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+
+                    {/* Competitor 1 */}
+                    <div className="flex-1 min-w-[200px]">
+                      <label className="text-xs text-gray-500 block mb-0.5">Competitor 1</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={team.competitor1_name}
+                          onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, competitor1_name: e.target.value} : t))}
+                          className="flex-1 px-2 py-1 border rounded text-sm"
+                        />
+                        <span className="text-xs text-gray-400 flex-shrink-0">{team.competitor1_tshirt || '—'}</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{team.competitor1_email}</div>
+                    </div>
+
+                    {/* Competitor 2 */}
+                    <div className="flex-1 min-w-[200px]">
+                      <label className={`text-xs block mb-0.5 ${team.partnerFound ? 'text-gray-500' : 'text-yellow-600 font-semibold'}`}>
+                        Competitor 2 {!team.partnerFound && `⚠ Not found (entered: "${team.partnerRaw}")`}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={team.competitor2_name}
+                          onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, competitor2_name: e.target.value} : t))}
+                          className={`flex-1 px-2 py-1 border rounded text-sm ${!team.partnerFound ? 'border-yellow-400 bg-yellow-50' : ''}`}
+                        />
+                        {team.competitor2_tshirt && (
+                          <span className="text-xs text-gray-400 flex-shrink-0">{team.competitor2_tshirt}</span>
+                        )}
+                      </div>
+                      {team.competitor2_email && (
+                        <div className="text-xs text-gray-400 mt-0.5">{team.competitor2_email}</div>
+                      )}
+                    </div>
+
+                    {/* Division flags */}
+                    <div className="flex flex-col gap-1 flex-shrink-0">
+                      <label className="text-xs text-gray-500 block mb-0.5">Divisions</label>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!team.is_women}
+                          onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, is_women: e.target.checked} : t))}
+                          className="w-3.5 h-3.5 accent-blue-500"
+                        />
+                        <span className="text-xs">Women's</span>
+                      </label>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!team.is_junior}
+                          onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, is_junior: e.target.checked} : t))}
+                          className="w-3.5 h-3.5 accent-purple-500"
+                        />
+                        <span className="text-xs">Juniors</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex items-center justify-between gap-4 border-t">
+              <div className="text-sm text-gray-600">
+                <span className="font-semibold text-green-700">{importPreview.filter(t => t.include && t.team_number).length}</span> teams ready to import
+                {importPreview.filter(t => t.include && !t.team_number).length > 0 && (
+                  <span className="text-red-600 ml-2">({importPreview.filter(t => t.include && !t.team_number).length} missing team numbers)</span>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setImportPreview(null)}
+                  className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={commitImport}
+                  disabled={importing || importPreview.filter(t => t.include && t.team_number).length === 0}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold disabled:opacity-50"
+                >
+                  {importing ? 'Importing…' : `Confirm Import (${importPreview.filter(t => t.include && t.team_number).length} teams)`}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
