@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Users, Plus, Search, Edit, Trash2 } from 'lucide-react'
+import { Users, Plus, Search, Edit, Trash2, Download } from 'lucide-react'
 
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
 
@@ -382,7 +382,7 @@ export default function TeamManagement() {
           notes: (!team.partnerFound && team.partnerRaw)
             ? `Specified partner: ${team.partnerRaw} (not registered)`
             : '',
-          registered: true,
+          registered: false,
         }
         const { error } = await supabase.from('teams').insert([teamData])
         if (error) errors.push(`Team ${team.team_number} (${team.competitor1_name}): ${error.message}`)
@@ -423,6 +423,97 @@ export default function TeamManagement() {
     const a = document.createElement('a')
     a.href = url
     a.download = `unmatched-competitors-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportAllTeams = () => {
+    if (!teams.length) return
+
+    // Use exact TryBooking column names so the file re-imports cleanly.
+    // One row per competitor (2 rows per complete team, 1 for incomplete).
+    // Extra columns at the end are ignored by the importer.
+    const TSHIRT_HEADER = "Ticket Data: T Shirt Size (we Have Purchased A Few Spares For Late Bookings After 8th Of Feb But Sorry We Cannot Guarantee A Tshirt For Late Entries))"
+    const headers = [
+      'Ticket Data: Competitor First Name',
+      'Ticket Data: Competitor Last Name',
+      'Ticket Data: Competitors Email',
+      'Ticket Data: Dive Partner',
+      TSHIRT_HEADER,
+      'Ticket Data: Divisions You Are Entering.',
+      'Ticket Type',
+      'Booking ID',
+      // Extra columns (ignored on re-import, useful for admin)
+      'Team Number',
+      'Club',
+      'Notes',
+      'Registered',
+      'Attended Briefing',
+    ]
+
+    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+
+    const divisionStr = (isJunior, isWomen) => {
+      if (isJunior && isWomen) return 'Women;Juniors'
+      if (isJunior) return 'Juniors'
+      if (isWomen) return 'Women'
+      return ''
+    }
+
+    const ticketType = (isJunior) => isJunior ? 'One Junior Under 18' : 'One Adult'
+
+    const splitName = (fullName) => {
+      const parts = (fullName || '').trim().split(' ')
+      const last = parts.length > 1 ? parts.pop() : ''
+      return { first: parts.join(' '), last }
+    }
+
+    const csvRows = []
+    for (const team of teams) {
+      const c1 = splitName(team.competitor1_name)
+      const c2 = splitName(team.competitor2_name)
+      const divStr = divisionStr(team.is_junior, team.is_women)
+      const extra = [
+        esc(team.team_number),
+        esc(team.club || ''),
+        esc(team.notes || ''),
+        esc(team.registered ? 'Yes' : 'No'),
+        esc(team.attended_briefing ? 'Yes' : 'No'),
+      ]
+
+      // Competitor 1 row — partner field points to competitor 2
+      csvRows.push([
+        esc(c1.first), esc(c1.last),
+        esc(team.competitor1_email || ''),
+        esc(team.competitor2_name || ''),   // dive partner = c2 name
+        esc(team.tshirt1 || ''),
+        esc(divStr),
+        esc(ticketType(team.is_junior)),
+        esc(team.id || ''),
+        ...extra,
+      ].join(','))
+
+      // Competitor 2 row — only if they exist
+      if (team.competitor2_name) {
+        csvRows.push([
+          esc(c2.first), esc(c2.last),
+          esc(team.competitor2_email || ''),
+          esc(team.competitor1_name || ''),  // dive partner = c1 name
+          esc(team.tshirt2 || ''),
+          esc(divStr),
+          esc(ticketType(team.is_junior)),
+          esc(team.id || ''),
+          ...extra,
+        ].join(','))
+      }
+    }
+
+    const csv = [headers.map(h => `"${h}"`).join(','), ...csvRows].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `teams-export-${new Date().toISOString().slice(0,10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -510,6 +601,16 @@ export default function TeamManagement() {
                 {importing ? 'Importing...' : 'Import TryBooking CSV'}
               </label>
             </div>
+
+            <button
+              onClick={exportAllTeams}
+              disabled={teams.length === 0}
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 flex items-center gap-2 disabled:opacity-40"
+              title="Export all teams as a CSV that can be re-imported"
+            >
+              <Download className="w-5 h-5" />
+              Export Teams CSV
+            </button>
 
             <button
               onClick={() => {

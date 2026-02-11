@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Camera, Check, Search, AlertTriangle } from 'lucide-react'
+import { Camera, Check, Search, AlertTriangle, Download } from 'lucide-react'
 
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
 
@@ -258,6 +258,81 @@ export default function WeighmasterInterface() {
     }
   }
 
+  const exportResults = async () => {
+    // Fetch all catches joined with team data
+    const { data: catches } = await supabase
+      .from('catches')
+      .select('*, teams(*)')
+      .order('created_at', { ascending: true })
+
+    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+
+    const headers = [
+      'Team Number',
+      'Competitor 1',
+      'Competitor 2',
+      'Competitor 3',
+      'Club',
+      'Division',
+      'Registered',
+      'Attended Briefing',
+      'Catfish Count',
+      'Heaviest Fish (g)',
+      'Lightest Fish (g)',
+      'Status',
+      'Submitted At',
+      'Notes',
+    ]
+
+    const divisionStr = (t) => {
+      if (t.is_junior && t.is_women) return 'Women / Juniors'
+      if (t.is_junior) return 'Juniors'
+      if (t.is_women) return 'Women'
+      return 'Open'
+    }
+
+    // Build one row per team - include all teams, catch data blank if not yet weighed in
+    const allTeams = [...teams]
+    const catchMap = {}
+    if (catches) {
+      for (const c of catches) {
+        // Keep latest catch per team
+        if (!catchMap[c.team_id] || c.created_at > catchMap[c.team_id].created_at) {
+          catchMap[c.team_id] = c
+        }
+      }
+    }
+
+    const rows = allTeams.map(t => {
+      const c = catchMap[t.id]
+      return [
+        esc(t.team_number),
+        esc(t.competitor1_name || ''),
+        esc(t.competitor2_name || ''),
+        esc(t.competitor3_name || ''),
+        esc(t.club || ''),
+        esc(divisionStr(t)),
+        esc(t.registered ? 'Yes' : 'No'),
+        esc(t.attended_briefing ? 'Yes' : 'No'),
+        esc(c ? c.catfish_count : ''),
+        esc(c?.heaviest_fish_grams ?? ''),
+        esc(c?.lightest_fish_grams ?? ''),
+        esc(c ? c.status : 'not entered'),
+        esc(c ? new Date(c.created_at).toLocaleString('en-NZ') : ''),
+        esc(t.notes || ''),
+      ].join(',')
+    })
+
+    const csv = [headers.map(h => esc(h)).join(','), ...rows].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `catfish-results-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-4xl mx-auto">
@@ -267,12 +342,21 @@ export default function WeighmasterInterface() {
               <img src={SNZ_LOGO} alt="Spearfishing New Zealand" className="h-12 object-contain" />
               <h1 className="text-3xl font-bold text-gray-900">Weighmaster Interface</h1>
             </div>
-            <button
-              onClick={() => navigate('/admin')}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-            >
-              Back to Dashboard
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={exportResults}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export Results CSV
+              </button>
+              <button
+                onClick={() => navigate('/admin')}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              >
+                Back to Dashboard
+              </button>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
