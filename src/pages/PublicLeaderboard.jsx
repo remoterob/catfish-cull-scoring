@@ -247,15 +247,6 @@ export default function PublicLeaderboard() {
 
           </div>
 
-          {/* Catfish eradicated — full width highlight */}
-          <div className="mt-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg p-4 text-center text-white">
-            <div className="text-4xl font-black tracking-tight">
-              {catches.reduce((sum, c) => sum + (c.catfish_count || 0), 0).toLocaleString()}
-            </div>
-            <div className="text-sm font-semibold uppercase tracking-widest mt-0.5 opacity-90">
-              🐟 Catfish Eradicated
-            </div>
-          </div>
         </div>
 
         {/* PRIZE FISH — different icons for heavy vs light */}
@@ -288,19 +279,27 @@ export default function PublicLeaderboard() {
 
         {/* STATS */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          {[
-            { label: 'Teams', value: totalTeams },
-            { label: 'Catfish', value: totalCatfish },
-            { label: 'Average', value: avgCatfish },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-white rounded-lg shadow-lg p-4">
-              <div className="flex items-center gap-1 text-blue-600 mb-1">
-                <TrendingUp className="w-4 h-4" />
-                <h3 className="font-semibold text-xs md:text-sm">{label}</h3>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <div className="bg-white rounded-lg shadow-lg p-4">
+            <div className="flex items-center gap-1 text-blue-600 mb-1">
+              <TrendingUp className="w-4 h-4" />
+              <h3 className="font-semibold text-xs md:text-sm">Teams</h3>
             </div>
-          ))}
+            <p className="text-2xl font-bold text-gray-900">{totalTeams}</p>
+          </div>
+          <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-lg shadow-lg p-4 text-white">
+            <div className="flex items-center gap-1 mb-1 opacity-90">
+              <span className="text-sm">🐟</span>
+              <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wide">Catfish Eradicated</h3>
+            </div>
+            <p className="text-2xl font-bold">{totalCatfish.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow-lg p-4">
+            <div className="flex items-center gap-1 text-blue-600 mb-1">
+              <TrendingUp className="w-4 h-4" />
+              <h3 className="font-semibold text-xs md:text-sm">Average</h3>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{avgCatfish}</p>
+          </div>
         </div>
 
         {/* LEADERBOARD — table on desktop */}
