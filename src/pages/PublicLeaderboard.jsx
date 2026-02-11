@@ -156,9 +156,16 @@ export default function PublicLeaderboard() {
               alt="Spearfishing New Zealand"
               className="h-16 md:h-20 w-auto object-contain flex-shrink-0"
             />
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-blue-900">Catfish Cull 2026</h1>
-              <p className="text-lg text-gray-500">Live Results</p>
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold text-blue-900">Catfish Cull 2026</h1>
+                <p className="text-lg text-gray-500">Live Results</p>
+              </div>
+              <img
+                src="https://zodqgekuackcrqyzluoo.supabase.co/storage/v1/object/public/assets/Catfish.png"
+                alt="Catfish"
+                className="h-16 md:h-20 w-auto object-contain flex-shrink-0"
+              />
             </div>
           </div>
 
@@ -253,8 +260,8 @@ export default function PublicLeaderboard() {
           </div>
           <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-lg shadow-lg p-4 text-white">
             <div className="flex items-center gap-1 mb-1 opacity-90">
-              <span className="text-sm">🐟</span>
-              <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wide">Catfish Eradicated</h3>
+              <span className="text-sm leading-none">🐟</span>
+              <h3 className="font-semibold text-xs leading-tight">Catfish Eradicated</h3>
             </div>
             <p className="text-2xl font-bold">{totalCatfish.toLocaleString()}</p>
           </div>
