@@ -194,9 +194,9 @@ export default function PublicLeaderboard() {
         <div className="bg-white rounded-lg shadow-lg p-3 mb-6">
           <div className="grid grid-cols-3 gap-2">
             {[
-              { id: 'All',     label: '🎯 All' },
-              { id: 'Women',   label: '👩 Women' },
-              { id: 'Juniors', label: '🧒 Juniors' },
+              { id: 'All',     label: `🎯 All (${allTeams.length})` },
+              { id: 'Women',   label: `👩 Women (${allTeams.filter(t => t.is_women).length})` },
+              { id: 'Juniors', label: `🧒 Juniors (${allTeams.filter(t => t.is_junior).length})` },
             ].map(({ id, label }) => (
               <button
                 key={id}
@@ -213,41 +213,6 @@ export default function PublicLeaderboard() {
           </div>
         </div>
 
-        {/* STATS PANEL */}
-        <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-
-            {/* Total Teams */}
-            <div className="bg-blue-50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-black text-blue-700">{allTeams.length}</div>
-              <div className="text-xs text-blue-600 font-semibold uppercase tracking-wide mt-0.5">Total Teams</div>
-            </div>
-
-            {/* Scores Submitted */}
-            <div className="bg-green-50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-black text-green-700">{catches.length}</div>
-              <div className="text-xs text-green-600 font-semibold uppercase tracking-wide mt-0.5">Scores In</div>
-            </div>
-
-            {/* Women's teams */}
-            <div className="bg-pink-50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-black text-pink-700">
-                {allTeams.filter(t => t.is_women).length}
-              </div>
-              <div className="text-xs text-pink-600 font-semibold uppercase tracking-wide mt-0.5">Women's Teams</div>
-            </div>
-
-            {/* Junior teams */}
-            <div className="bg-purple-50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-black text-purple-700">
-                {allTeams.filter(t => t.is_junior).length}
-              </div>
-              <div className="text-xs text-purple-600 font-semibold uppercase tracking-wide mt-0.5">Junior Teams</div>
-            </div>
-
-          </div>
-
-        </div>
 
         {/* PRIZE FISH — different icons for heavy vs light */}
         {(heaviestFish || lightestFish) && (
