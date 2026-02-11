@@ -27,7 +27,15 @@ export default function TeamManagement() {
     competitor3_name: '',
     competitor3_email: '',
     club: '',
-    notes: ''
+    notes: '',
+    tshirt1: '',
+    tshirt1_taken: false,
+    tshirt2: '',
+    tshirt2_taken: false,
+    tshirt3: '',
+    tshirt3_taken: false,
+    registered: false,
+    attended_briefing: false
   })
 
   const fetchTeams = async () => {
@@ -108,8 +116,31 @@ export default function TeamManagement() {
       competitor3_name: '',
       competitor3_email: '',
       club: '',
-      notes: ''
+      notes: '',
+      tshirt1: '',
+      tshirt1_taken: false,
+      tshirt2: '',
+      tshirt2_taken: false,
+      tshirt3: '',
+      tshirt3_taken: false,
+      registered: false,
+      attended_briefing: false
     })
+  }
+
+  // Inline-update a single boolean field without opening the modal
+  const handleInlineToggle = async (teamId, field, currentValue) => {
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({ [field]: !currentValue })
+        .eq('id', teamId)
+      if (error) throw error
+      setTeams(prev => prev.map(t => t.id === teamId ? { ...t, [field]: !currentValue } : t))
+    } catch (err) {
+      console.error('Inline update error:', err)
+      alert('Failed to update: ' + err.message)
+    }
   }
 
   const startEdit = (team) => {
@@ -365,6 +396,9 @@ export default function TeamManagement() {
                   <th className="px-4 py-3 text-left whitespace-nowrap">Division</th>
                   <th className="px-4 py-3 text-left whitespace-nowrap">Competitors</th>
                   <th className="px-4 py-3 text-left whitespace-nowrap">Club</th>
+                  <th className="px-3 py-3 text-center whitespace-nowrap">Reg'd</th>
+                  <th className="px-3 py-3 text-center whitespace-nowrap">Briefing</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">T-Shirts</th>
                   <th className="px-4 py-3 text-left whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
@@ -398,6 +432,52 @@ export default function TeamManagement() {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{team.club || '-'}</td>
+                    {/* Registered */}
+                    <td className="px-3 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!team.registered}
+                        onChange={() => handleInlineToggle(team.id, 'registered', !!team.registered)}
+                        className="w-5 h-5 rounded cursor-pointer accent-green-600"
+                        title="Registered"
+                      />
+                    </td>
+                    {/* Attended Briefing */}
+                    <td className="px-3 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!team.attended_briefing}
+                        onChange={() => handleInlineToggle(team.id, 'attended_briefing', !!team.attended_briefing)}
+                        className="w-5 h-5 rounded cursor-pointer accent-blue-600"
+                        title="Attended Briefing"
+                      />
+                    </td>
+                    {/* T-Shirts */}
+                    <td className="px-3 py-3">
+                      <div className="space-y-1 min-w-[160px]">
+                        {[
+                          { size: team.tshirt1, takenField: 'tshirt1_taken', taken: team.tshirt1_taken },
+                          { size: team.tshirt2, takenField: 'tshirt2_taken', taken: team.tshirt2_taken },
+                          { size: team.tshirt3, takenField: 'tshirt3_taken', taken: team.tshirt3_taken },
+                        ].filter(t => t.size).map((t, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={!!t.taken}
+                              onChange={() => handleInlineToggle(team.id, t.takenField, !!t.taken)}
+                              className="w-4 h-4 rounded cursor-pointer accent-orange-500 flex-shrink-0"
+                              title={t.taken ? 'Collected' : 'Not yet collected'}
+                            />
+                            <span className={`text-xs ${t.taken ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                              {t.size}
+                            </span>
+                          </div>
+                        ))}
+                        {!team.tshirt1 && !team.tshirt2 && !team.tshirt3 && (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex gap-2">
                         <button
@@ -478,6 +558,49 @@ export default function TeamManagement() {
                       )}
                       {team.club && (
                         <div className="text-gray-500 mt-2">📍 {team.club}</div>
+                      )}
+                      {/* Inline status row */}
+                      <div className="flex flex-wrap gap-3 mt-2 pt-2 border-t border-gray-100">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!team.registered}
+                            onChange={() => handleInlineToggle(team.id, 'registered', !!team.registered)}
+                            className="w-4 h-4 rounded accent-green-600"
+                          />
+                          <span className="text-xs text-gray-600">Registered</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!team.attended_briefing}
+                            onChange={() => handleInlineToggle(team.id, 'attended_briefing', !!team.attended_briefing)}
+                            className="w-4 h-4 rounded accent-blue-600"
+                          />
+                          <span className="text-xs text-gray-600">Briefing</span>
+                        </label>
+                      </div>
+                      {/* T-shirt collected status */}
+                      {(team.tshirt1 || team.tshirt2 || team.tshirt3) && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {[
+                            { size: team.tshirt1, takenField: 'tshirt1_taken', taken: team.tshirt1_taken },
+                            { size: team.tshirt2, takenField: 'tshirt2_taken', taken: team.tshirt2_taken },
+                            { size: team.tshirt3, takenField: 'tshirt3_taken', taken: team.tshirt3_taken },
+                          ].filter(t => t.size).map((t, i) => (
+                            <label key={i} className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!t.taken}
+                                onChange={() => handleInlineToggle(team.id, t.takenField, !!t.taken)}
+                                className="w-4 h-4 rounded accent-orange-500"
+                              />
+                              <span className={`text-xs ${t.taken ? 'line-through text-gray-400' : 'text-gray-600'}`}>
+                                👕 {t.size}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -624,6 +747,63 @@ export default function TeamManagement() {
                   className="w-full px-3 py-2 border rounded-lg"
                   rows="2"
                 />
+              </div>
+
+              {/* Registration & Briefing */}
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Event Check-in</h3>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.registered}
+                      onChange={(e) => setFormData({...formData, registered: e.target.checked})}
+                      className="w-5 h-5 rounded accent-green-600"
+                    />
+                    <span className="text-sm font-medium">Registered</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.attended_briefing}
+                      onChange={(e) => setFormData({...formData, attended_briefing: e.target.checked})}
+                      className="w-5 h-5 rounded accent-blue-600"
+                    />
+                    <span className="text-sm font-medium">Attended Briefing</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* T-Shirts */}
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">T-Shirts</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: 'T-Shirt 1', sizeField: 'tshirt1', takenField: 'tshirt1_taken' },
+                    { label: 'T-Shirt 2', sizeField: 'tshirt2', takenField: 'tshirt2_taken' },
+                    { label: 'T-Shirt 3', sizeField: 'tshirt3', takenField: 'tshirt3_taken' },
+                  ].map(({ label, sizeField, takenField }) => (
+                    <div key={sizeField} className="flex items-center gap-3">
+                      <label className="text-sm text-gray-600 w-20 flex-shrink-0">{label}</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. L, XL, 2XL"
+                        value={formData[sizeField] || ''}
+                        onChange={(e) => setFormData({...formData, [sizeField]: e.target.value})}
+                        className="flex-1 px-3 py-1.5 border rounded-lg text-sm"
+                      />
+                      <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={!!formData[takenField]}
+                          onChange={(e) => setFormData({...formData, [takenField]: e.target.checked})}
+                          className="w-4 h-4 rounded accent-orange-500"
+                        />
+                        <span className="text-sm text-gray-600">Taken</span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="flex gap-4 pt-4">
