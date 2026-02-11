@@ -305,11 +305,12 @@ export default function TeamManagement() {
       // Sort: matched first, then unmatched
       teams.sort((a, b) => (b.partnerFound ? 1 : 0) - (a.partnerFound ? 1 : 0))
 
-      // Auto-assign team numbers from 1 (matched teams get numbers; unmatched left blank)
+      // Auto-assign team numbers from 1 for ALL teams (matched first, then unmatched)
       let nextNum = 1
       const numbered = teams.map(t => ({
         ...t,
-        team_number: t.partnerFound ? String(nextNum++) : '',
+        team_number: String(nextNum++),
+        include: t.partnerFound, // matched = checked by default; unmatched = unchecked but numbered
       }))
 
       setImportPreview(numbered)
@@ -373,11 +374,11 @@ export default function TeamManagement() {
           is_junior: team.is_junior,
           is_women: team.is_women,
           competitor1_name: team.competitor1_name,
-          competitor1_email: team.competitor1_email,
-          tshirt1: team.competitor1_tshirt,
-          competitor2_name: team.competitor2_name,
-          competitor2_email: team.competitor2_email,
-          tshirt2: team.competitor2_tshirt,
+          competitor1_email: team.competitor1_email || '',
+          tshirt1: team.competitor1_tshirt || '',
+          competitor2_name: team.competitor2_name || '',
+          competitor2_email: team.competitor2_email || '',
+          tshirt2: team.competitor2_tshirt || '',
           registered: true,
         }
         const { error } = await supabase.from('teams').insert([teamData])
@@ -433,9 +434,9 @@ export default function TeamManagement() {
     .filter(t => 
       searchTerm === '' ||
       t.team_number.toString().includes(searchTerm) ||
-      t.competitor1_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.competitor2_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t.competitor3_name && t.competitor3_name.toLowerCase().includes(searchTerm.toLowerCase()))
+      (t.competitor1_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.competitor2_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.competitor3_name || '').toLowerCase().includes(searchTerm.toLowerCase())
     )
 
   if (loading) {
@@ -599,7 +600,16 @@ export default function TeamManagement() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm">
-                        <div>{team.competitor1_name} & {team.competitor2_name}</div>
+                        {!team.competitor2_name ? (
+                          <div className="flex items-center gap-2">
+                            <span>{team.competitor1_name}</span>
+                            <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold border border-orange-300">
+                              Incomplete
+                            </span>
+                          </div>
+                        ) : (
+                          <div>{team.competitor1_name} &amp; {team.competitor2_name}</div>
+                        )}
                         {team.competitor3_name && (
                           <div className="text-gray-500">+ {team.competitor3_name}</div>
                         )}
@@ -726,7 +736,16 @@ export default function TeamManagement() {
                       </div>
                     </div>
                     <div className="text-sm space-y-1">
-                      <div>{team.competitor1_name} & {team.competitor2_name}</div>
+                      {!team.competitor2_name ? (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{team.competitor1_name}</span>
+                          <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold border border-orange-300">
+                            Incomplete
+                          </span>
+                        </div>
+                      ) : (
+                        <div>{team.competitor1_name} &amp; {team.competitor2_name}</div>
+                      )}
                       {team.competitor3_name && (
                         <div className="text-gray-500">+ {team.competitor3_name}</div>
                       )}
@@ -857,11 +876,13 @@ export default function TeamManagement() {
               </div>
 
               <div className="border-t pt-4">
-                <h3 className="font-semibold mb-2">Competitor 2 *</h3>
+                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                  Competitor 2
+                  <span className="text-xs font-normal text-gray-500">(optional — leave blank to save as Incomplete)</span>
+                </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <input
                     type="text"
-                    required
                     placeholder="Full Name"
                     value={formData.competitor2_name}
                     onChange={(e) => setFormData({...formData, competitor2_name: e.target.value})}
@@ -869,7 +890,6 @@ export default function TeamManagement() {
                   />
                   <input
                     type="email"
-                    required
                     placeholder="Email"
                     value={formData.competitor2_email}
                     onChange={(e) => setFormData({...formData, competitor2_email: e.target.value})}
@@ -1025,7 +1045,7 @@ export default function TeamManagement() {
             {/* Legend */}
             <div className="px-6 py-3 bg-gray-50 border-b flex flex-wrap gap-4 text-xs text-gray-600">
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500 inline-block"></span> Partner matched</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Partner not found — review before importing</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Partner not found — tick to import as Incomplete, or leave unchecked to skip</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Women's division</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-500 inline-block"></span> Juniors division</span>
             </div>
@@ -1079,7 +1099,7 @@ export default function TeamManagement() {
                     {/* Competitor 2 */}
                     <div className="flex-1 min-w-[200px]">
                       <label className={`text-xs block mb-0.5 ${team.partnerFound ? 'text-gray-500' : 'text-yellow-600 font-semibold'}`}>
-                        Competitor 2 {!team.partnerFound && `⚠ Not found (entered: "${team.partnerRaw}")`}
+                        Competitor 2 {!team.partnerFound && `⚠ Not found (entered: "${team.partnerRaw}") — will import as Incomplete if ticked`}
                       </label>
                       <div className="flex items-center gap-2">
                         <input
@@ -1130,8 +1150,8 @@ export default function TeamManagement() {
               {importPreview.filter(t => !t.partnerFound).length > 0 && (
                 <div className="flex items-center justify-between mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
                   <div className="text-sm text-yellow-800">
-                    <span className="font-semibold">{importPreview.filter(t => !t.partnerFound).length} competitors</span> could not be matched to a partner.
-                    Download to review offline.
+                    <span className="font-semibold">{importPreview.filter(t => !t.partnerFound).length} competitors</span> could not be auto-matched.
+                    Tick them above to import as <strong>Incomplete</strong>, or download to review offline.
                   </div>
                   <button
                     onClick={downloadUnmatched}
