@@ -310,7 +310,7 @@ export default function TeamManagement() {
       const numbered = teams.map(t => ({
         ...t,
         team_number: String(nextNum++),
-        include: t.partnerFound, // matched = checked by default; unmatched = unchecked but numbered
+        include: true, // all entries included by default
       }))
 
       setImportPreview(numbered)
@@ -369,6 +369,11 @@ export default function TeamManagement() {
 
     for (const team of toImport) {
       try {
+        // For unmatched entries: blank competitor 2, record entered partner name in notes
+        const unmatchedNote = !team.partnerFound && team.partnerRaw
+          ? `Specified partner: ${team.partnerRaw} (not registered)`
+          : ''
+
         const teamData = {
           team_number: parseInt(team.team_number),
           is_junior: team.is_junior,
@@ -376,9 +381,10 @@ export default function TeamManagement() {
           competitor1_name: team.competitor1_name,
           competitor1_email: team.competitor1_email || '',
           tshirt1: team.competitor1_tshirt || '',
-          competitor2_name: team.competitor2_name || '',
-          competitor2_email: team.competitor2_email || '',
-          tshirt2: team.competitor2_tshirt || '',
+          competitor2_name: team.partnerFound ? (team.competitor2_name || '') : '',
+          competitor2_email: team.partnerFound ? (team.competitor2_email || '') : '',
+          tshirt2: team.partnerFound ? (team.competitor2_tshirt || '') : '',
+          notes: unmatchedNote,
           registered: true,
         }
         const { error } = await supabase.from('teams').insert([teamData])
@@ -1045,7 +1051,7 @@ export default function TeamManagement() {
             {/* Legend */}
             <div className="px-6 py-3 bg-gray-50 border-b flex flex-wrap gap-4 text-xs text-gray-600">
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500 inline-block"></span> Partner matched</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Partner not found — tick to import as Incomplete, or leave unchecked to skip</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Partner not registered — importing as Incomplete, partner name saved in Notes</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Women's division</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-500 inline-block"></span> Juniors division</span>
             </div>
@@ -1098,22 +1104,38 @@ export default function TeamManagement() {
 
                     {/* Competitor 2 */}
                     <div className="flex-1 min-w-[200px]">
-                      <label className={`text-xs block mb-0.5 ${team.partnerFound ? 'text-gray-500' : 'text-yellow-600 font-semibold'}`}>
-                        Competitor 2 {!team.partnerFound && `⚠ Not found (entered: "${team.partnerRaw}") — will import as Incomplete if ticked`}
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={team.competitor2_name}
-                          onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, competitor2_name: e.target.value} : t))}
-                          className={`flex-1 px-2 py-1 border rounded text-sm ${!team.partnerFound ? 'border-yellow-400 bg-yellow-50' : ''}`}
-                        />
-                        {team.competitor2_tshirt && (
-                          <span className="text-xs text-gray-400 flex-shrink-0">{team.competitor2_tshirt}</span>
-                        )}
-                      </div>
-                      {team.competitor2_email && (
-                        <div className="text-xs text-gray-400 mt-0.5">{team.competitor2_email}</div>
+                      {team.partnerFound ? (
+                        <>
+                          <label className="text-xs text-gray-500 block mb-0.5">Competitor 2</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={team.competitor2_name}
+                              onChange={e => setImportPreview(prev => prev.map((t, i) => i === idx ? {...t, competitor2_name: e.target.value} : t))}
+                              className="flex-1 px-2 py-1 border rounded text-sm"
+                            />
+                            {team.competitor2_tshirt && (
+                              <span className="text-xs text-gray-400 flex-shrink-0">{team.competitor2_tshirt}</span>
+                            )}
+                          </div>
+                          {team.competitor2_email && (
+                            <div className="text-xs text-gray-400 mt-0.5">{team.competitor2_email}</div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <label className="text-xs text-yellow-600 font-semibold block mb-0.5">
+                            Competitor 2 — not registered
+                          </label>
+                          <div className="px-2 py-1 bg-orange-50 border border-orange-200 rounded text-sm text-gray-400 italic">
+                            (blank — importing as Incomplete)
+                          </div>
+                          {team.partnerRaw && (
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              📝 Note will say: <em>"Specified partner: {team.partnerRaw} (not registered)"</em>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -1150,8 +1172,8 @@ export default function TeamManagement() {
               {importPreview.filter(t => !t.partnerFound).length > 0 && (
                 <div className="flex items-center justify-between mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
                   <div className="text-sm text-yellow-800">
-                    <span className="font-semibold">{importPreview.filter(t => !t.partnerFound).length} competitors</span> could not be auto-matched.
-                    Tick them above to import as <strong>Incomplete</strong>, or download to review offline.
+                    <span className="font-semibold">{importPreview.filter(t => !t.partnerFound).length} competitors</span> could not be auto-matched and will import as <strong>Incomplete</strong> with partner name saved in Notes.
+                    Download the list to follow up.
                   </div>
                   <button
                     onClick={downloadUnmatched}
