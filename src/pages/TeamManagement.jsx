@@ -304,7 +304,15 @@ export default function TeamManagement() {
 
       // Sort: matched first, then unmatched
       teams.sort((a, b) => (b.partnerFound ? 1 : 0) - (a.partnerFound ? 1 : 0))
-      setImportPreview(teams)
+
+      // Auto-assign team numbers from 1 (matched teams get numbers; unmatched left blank)
+      let nextNum = 1
+      const numbered = teams.map(t => ({
+        ...t,
+        team_number: t.partnerFound ? String(nextNum++) : '',
+      }))
+
+      setImportPreview(numbered)
     } catch (err) {
       alert('Error reading file: ' + err.message)
     } finally {
@@ -386,6 +394,34 @@ export default function TeamManagement() {
 
   // Keep old handler name pointing to new one for the file input
   const handleCSVImport = handleTryBookingImport
+
+  // Download unmatched/problem entries as a CSV for offline review
+  const downloadUnmatched = () => {
+    if (!importPreview) return
+    const problems = importPreview.filter(t => !t.partnerFound)
+    if (!problems.length) return
+
+    const headers = ['Competitor 1 Name', 'Competitor 1 Email', 'Competitor 1 T-Shirt', 'Partner Name Entered', 'Is Junior', 'Is Women', 'Booking ID']
+    const escape = v => `"${String(v || '').replace(/"/g, '""')}"`
+    const rows = problems.map(t => [
+      escape(t.competitor1_name),
+      escape(t.competitor1_email),
+      escape(t.competitor1_tshirt),
+      escape(t.partnerRaw),
+      escape(t.is_junior ? 'Yes' : 'No'),
+      escape(t.is_women ? 'Yes' : 'No'),
+      escape(t.bookingId),
+    ].join(','))
+
+    const csv = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `unmatched-competitors-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const filteredTeams = teams
     .filter(t => {
@@ -1089,27 +1125,44 @@ export default function TeamManagement() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex items-center justify-between gap-4 border-t">
-              <div className="text-sm text-gray-600">
-                <span className="font-semibold text-green-700">{importPreview.filter(t => t.include && t.team_number).length}</span> teams ready to import
-                {importPreview.filter(t => t.include && !t.team_number).length > 0 && (
-                  <span className="text-red-600 ml-2">({importPreview.filter(t => t.include && !t.team_number).length} missing team numbers)</span>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setImportPreview(null)}
-                  className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={commitImport}
-                  disabled={importing || importPreview.filter(t => t.include && t.team_number).length === 0}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold disabled:opacity-50"
-                >
-                  {importing ? 'Importing…' : `Confirm Import (${importPreview.filter(t => t.include && t.team_number).length} teams)`}
-                </button>
+            <div className="px-6 py-4 bg-gray-50 rounded-b-xl border-t">
+              {/* Unmatched download banner */}
+              {importPreview.filter(t => !t.partnerFound).length > 0 && (
+                <div className="flex items-center justify-between mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
+                  <div className="text-sm text-yellow-800">
+                    <span className="font-semibold">{importPreview.filter(t => !t.partnerFound).length} competitors</span> could not be matched to a partner.
+                    Download to review offline.
+                  </div>
+                  <button
+                    onClick={downloadUnmatched}
+                    className="ml-4 px-4 py-1.5 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 font-semibold flex-shrink-0"
+                  >
+                    ⬇ Download Unmatched CSV
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm text-gray-600">
+                  <span className="font-semibold text-green-700">{importPreview.filter(t => t.include && t.team_number).length}</span> teams ready to import
+                  {importPreview.filter(t => t.include && !t.team_number).length > 0 && (
+                    <span className="text-red-600 ml-2">({importPreview.filter(t => t.include && !t.team_number).length} missing team numbers)</span>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setImportPreview(null)}
+                    className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={commitImport}
+                    disabled={importing || importPreview.filter(t => t.include && t.team_number).length === 0}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {importing ? 'Importing…' : `Confirm Import (${importPreview.filter(t => t.include && t.team_number).length} teams)`}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
