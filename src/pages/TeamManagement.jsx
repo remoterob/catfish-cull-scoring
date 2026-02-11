@@ -285,7 +285,7 @@ export default function TeamManagement() {
           competitor1_name: name,
           competitor1_email: row[EMAIL_COL] || '',
           competitor1_tshirt: row[TSHIRT_COL] || '',
-          competitor2_name: partnerName,
+          competitor2_name: partnerRow ? partnerName : '',   // blank if not matched
           competitor2_email: c2Email,
           competitor2_tshirt: c2Tshirt,
           // flags
@@ -297,8 +297,8 @@ export default function TeamManagement() {
           bookingId: row[BOOKING_ID_COL] || '',
           // editable team number (user assigns)
           team_number: '',
-          // include in import
-          include: !!partnerRow,
+          // include all — unmatched import as Incomplete with note
+          include: true,
         })
       }
 
@@ -369,11 +369,6 @@ export default function TeamManagement() {
 
     for (const team of toImport) {
       try {
-        // For unmatched entries: blank competitor 2, record entered partner name in notes
-        const unmatchedNote = !team.partnerFound && team.partnerRaw
-          ? `Specified partner: ${team.partnerRaw} (not registered)`
-          : ''
-
         const teamData = {
           team_number: parseInt(team.team_number),
           is_junior: team.is_junior,
@@ -381,10 +376,12 @@ export default function TeamManagement() {
           competitor1_name: team.competitor1_name,
           competitor1_email: team.competitor1_email || '',
           tshirt1: team.competitor1_tshirt || '',
-          competitor2_name: team.partnerFound ? (team.competitor2_name || '') : '',
-          competitor2_email: team.partnerFound ? (team.competitor2_email || '') : '',
-          tshirt2: team.partnerFound ? (team.competitor2_tshirt || '') : '',
-          notes: unmatchedNote,
+          competitor2_name: team.competitor2_name || '',
+          competitor2_email: team.competitor2_email || '',
+          tshirt2: team.competitor2_tshirt || '',
+          notes: (!team.partnerFound && team.partnerRaw)
+            ? `Specified partner: ${team.partnerRaw} (not registered)`
+            : '',
           registered: true,
         }
         const { error } = await supabase.from('teams').insert([teamData])
