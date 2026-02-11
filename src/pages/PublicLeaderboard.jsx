@@ -156,16 +156,8 @@ export default function PublicLeaderboard() {
               alt="Spearfishing New Zealand"
               className="h-16 md:h-20 w-auto object-contain flex-shrink-0"
             />
-            <div className="flex items-center gap-4">
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-blue-900">Catfish Cull 2026</h1>
-                <p className="text-lg text-gray-500">Live Results</p>
-              </div>
-              <img
-                src="https://zodqgekuackcrqyzluoo.supabase.co/storage/v1/object/public/assets/Catfish.png"
-                alt="Catfish"
-                className="h-16 md:h-20 w-auto object-contain flex-shrink-0"
-              />
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-blue-900">Catfish Cull 2026</h1>
             </div>
           </div>
 
