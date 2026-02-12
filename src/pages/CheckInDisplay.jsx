@@ -90,10 +90,10 @@ function TeamCard({ team, variant }) {
       <div className="flex flex-wrap items-center gap-1 mt-1.5">
         <DivisionBadges team={team} />
       </div>
-      {(team.competitor1_shirt || team.competitor2_shirt) && (
+      {(team.tshirt1 || team.tshirt2) && (
         <div className="flex items-center gap-2 mt-1">
-          {team.competitor1_shirt && <ShirtBadge size={team.competitor1_shirt} label="C1" />}
-          {team.competitor2_shirt && <ShirtBadge size={team.competitor2_shirt} label="C2" />}
+          {team.tshirt1 && <ShirtBadge size={team.tshirt1} label="C1" />}
+          {team.tshirt2 && <ShirtBadge size={team.tshirt2} label="C2" />}
         </div>
       )}
     </div>
