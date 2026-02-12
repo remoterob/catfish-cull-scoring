@@ -3,6 +3,7 @@ import { isAdmin } from './lib/supabase'
 
 // Pages
 import PublicLeaderboard from './pages/PublicLeaderboard'
+import CheckInDisplay from './pages/CheckInDisplay'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
 import TeamManagement from './pages/TeamManagement'
@@ -22,6 +23,7 @@ function App() {
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<PublicLeaderboard />} />
+      <Route path="/checkin" element={<CheckInDisplay />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       
       {/* Protected Admin Routes */}
