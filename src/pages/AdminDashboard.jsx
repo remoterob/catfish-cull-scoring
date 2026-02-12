@@ -21,6 +21,13 @@ export default function AdminDashboard() {
       color: 'bg-blue-500'
     },
     {
+      title: 'Check-In Display',
+      description: 'Registration status board for the venue',
+      icon: Users,
+      path: '/checkin',
+      color: 'bg-teal-500'
+    },
+    {
       title: 'Weighmaster',
       description: 'Enter scores and upload photos',
       icon: Scale,

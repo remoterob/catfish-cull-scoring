@@ -159,7 +159,7 @@ export default function PublicLeaderboard() {
               className="h-16 md:h-20 w-auto object-contain flex-shrink-0"
             />
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-blue-900">Catfish Cull 2026</h1>
+              <h1 className="text-3xl md:text-4xl font-bold text-blue-900">Rosemergy Catfish Cull 2026</h1>
             </div>
           </div>
 
