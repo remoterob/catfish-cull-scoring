@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Users, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 
@@ -72,10 +72,17 @@ function TeamCard({ team, variant }) {
   )
 }
 
+const TEAMS_PER_PAGE = 20
+const PAGE_INTERVAL = 8000 // 8 seconds per page
+
 export default function CheckInDisplay() {
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(new Date())
+  const [arrivingPage, setArrivingPage] = useState(0)
+  const [checkedInPage, setCheckedInPage] = useState(0)
+  const arrivingPageRef = useRef(0)
+  const checkedInPageRef = useRef(0)
 
   const fetchTeams = async () => {
     try {
@@ -94,6 +101,7 @@ export default function CheckInDisplay() {
     }
   }
 
+  // Data refresh — independent of pagination
   useEffect(() => {
     fetchTeams()
     const interval = setInterval(fetchTeams, 5000)
@@ -111,9 +119,55 @@ export default function CheckInDisplay() {
   const checkedIn = teams
     .filter(t => t.registered)
     .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-    .slice(0, 20)
 
-  const totalCheckedIn = teams.filter(t => t.registered).length
+  const totalCheckedIn = checkedIn.length
+
+  const arrivingTotalPages = Math.max(1, Math.ceil(notYetArrived.length / TEAMS_PER_PAGE))
+  const checkedInTotalPages = Math.max(1, Math.ceil(checkedIn.length / TEAMS_PER_PAGE))
+
+  const arrivingPageTeams = notYetArrived.slice(
+    arrivingPage * TEAMS_PER_PAGE,
+    (arrivingPage + 1) * TEAMS_PER_PAGE
+  )
+  const checkedInPageTeams = checkedIn.slice(
+    checkedInPage * TEAMS_PER_PAGE,
+    (checkedInPage + 1) * TEAMS_PER_PAGE
+  )
+
+  // Auto-advance arriving page — independent timer
+  useEffect(() => {
+    if (arrivingTotalPages <= 1) return
+    const timer = setInterval(() => {
+      arrivingPageRef.current = (arrivingPageRef.current + 1) % arrivingTotalPages
+      setArrivingPage(arrivingPageRef.current)
+    }, PAGE_INTERVAL)
+    return () => clearInterval(timer)
+  }, [arrivingTotalPages])
+
+  // Auto-advance checked-in page — independent timer
+  useEffect(() => {
+    if (checkedInTotalPages <= 1) return
+    const timer = setInterval(() => {
+      checkedInPageRef.current = (checkedInPageRef.current + 1) % checkedInTotalPages
+      setCheckedInPage(checkedInPageRef.current)
+    }, PAGE_INTERVAL)
+    return () => clearInterval(timer)
+  }, [checkedInTotalPages])
+
+  // Clamp pages if list shrinks
+  useEffect(() => {
+    if (arrivingPage >= arrivingTotalPages) {
+      setArrivingPage(0)
+      arrivingPageRef.current = 0
+    }
+  }, [arrivingTotalPages])
+
+  useEffect(() => {
+    if (checkedInPage >= checkedInTotalPages) {
+      setCheckedInPage(0)
+      checkedInPageRef.current = 0
+    }
+  }, [checkedInTotalPages])
 
   if (loading) {
     return (
@@ -180,17 +234,38 @@ export default function CheckInDisplay() {
               {/* Not Yet Arrived */}
               {notYetArrived.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                    <h3 className="font-bold text-amber-700 uppercase tracking-wide text-sm">
-                      Still to Arrive ({notYetArrived.length})
-                    </h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-400"></div>
+                      <h3 className="font-bold text-amber-700 uppercase tracking-wide text-sm">
+                        Still to Arrive ({notYetArrived.length})
+                      </h3>
+                    </div>
+                    {arrivingTotalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { const p = (arrivingPage - 1 + arrivingTotalPages) % arrivingTotalPages; setArrivingPage(p); arrivingPageRef.current = p; }}
+                          className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold flex items-center justify-center">‹</button>
+                        <span className="text-xs text-amber-600 font-semibold whitespace-nowrap">
+                          {arrivingPage + 1} / {arrivingTotalPages}
+                        </span>
+                        <button onClick={() => { const p = (arrivingPage + 1) % arrivingTotalPages; setArrivingPage(p); arrivingPageRef.current = p; }}
+                          className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold flex items-center justify-center">›</button>
+                      </div>
+                    )}
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 max-h-[600px] overflow-y-auto pr-1">
-                    {notYetArrived.map(team => (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                    {arrivingPageTeams.map(team => (
                       <TeamCard key={team.id} team={team} variant="waiting" />
                     ))}
                   </div>
+                  {arrivingTotalPages > 1 && (
+                    <div className="flex justify-center gap-1.5 mt-3">
+                      {Array.from({ length: arrivingTotalPages }).map((_, i) => (
+                        <button key={i} onClick={() => { setArrivingPage(i); arrivingPageRef.current = i; }}
+                          className={`w-2 h-2 rounded-full transition-all ${i === arrivingPage ? 'bg-amber-500 w-4' : 'bg-amber-200'}`} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -221,7 +296,7 @@ export default function CheckInDisplay() {
             <CheckCircle className="w-6 h-6 text-green-500" />
             Checked In
             <span className="text-base font-normal text-gray-400 ml-1">
-              {totalCheckedIn > 20 ? `(showing most recent 20 of ${totalCheckedIn})` : `(${totalCheckedIn})`}
+              {totalCheckedIn > 0 ? `(${totalCheckedIn})` : ''}
             </span>
           </h2>
 
@@ -231,11 +306,28 @@ export default function CheckInDisplay() {
               <p className="text-lg font-medium">No teams checked in yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
-              {checkedIn.map(team => (
-                <TeamCard key={team.id} team={team} variant="arrived" />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
+                {checkedInPageTeams.map(team => (
+                  <TeamCard key={team.id} team={team} variant="arrived" />
+                ))}
+              </div>
+              {checkedInTotalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 mt-4">
+                  <button onClick={() => { const p = (checkedInPage - 1 + checkedInTotalPages) % checkedInTotalPages; setCheckedInPage(p); checkedInPageRef.current = p; }}
+                    className="w-7 h-7 rounded bg-green-100 hover:bg-green-200 text-green-700 text-sm font-bold flex items-center justify-center">‹</button>
+                  <div className="flex gap-1.5">
+                    {Array.from({ length: checkedInTotalPages }).map((_, i) => (
+                      <button key={i} onClick={() => { setCheckedInPage(i); checkedInPageRef.current = i; }}
+                        className={`w-2 h-2 rounded-full transition-all ${i === checkedInPage ? 'bg-green-500 w-4' : 'bg-green-200'}`} />
+                    ))}
+                  </div>
+                  <span className="text-xs text-green-600 font-semibold">{checkedInPage + 1} / {checkedInTotalPages}</span>
+                  <button onClick={() => { const p = (checkedInPage + 1) % checkedInTotalPages; setCheckedInPage(p); checkedInPageRef.current = p; }}
+                    className="w-7 h-7 rounded bg-green-100 hover:bg-green-200 text-green-700 text-sm font-bold flex items-center justify-center">›</button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
