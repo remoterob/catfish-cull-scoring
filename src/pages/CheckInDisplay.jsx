@@ -3,208 +3,163 @@ import { supabase } from '../lib/supabase'
 import { Users, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
+const TAB_INTERVAL = 10000
+const PAGE_INTERVAL = 8000
 
-function DivisionBadges({ team }) {
-  return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
-      {team.is_junior && (
-        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Juniors</span>
-      )}
-      {team.is_women && (
-        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800">Women</span>
-      )}
-    </div>
-  )
-}
-
-function ShirtIcon({ size }) {
-  if (!size) return null
-  // Strip "Male "/"Female "/"Child " prefix for display
-  const display = size.replace(/^(Male |Female |Child )/i, '')
-  return (
-    <div className="flex flex-col items-center gap-0" title={size}>
-      <svg viewBox="0 0 100 90" className="w-6 h-6" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M30 5 L15 20 L2 15 L10 40 L20 38 L20 85 L80 85 L80 38 L90 40 L98 15 L85 20 L70 5 Q60 14 50 14 Q40 14 30 5 Z"
-          fill="white"
-          stroke="#9ca3af"
-          strokeWidth="4"
-          strokeLinejoin="round"
-        />
-        <text
-          x="50"
-          y="63"
-          textAnchor="middle"
-          fontSize={display.length > 2 ? "26" : "30"}
-          fontWeight="bold"
-          fill="#374151"
-          fontFamily="Arial, sans-serif"
-        >{display}</text>
-      </svg>
-    </div>
-  )
-}
-
-function ShirtBadge({ size }) {
-  if (!size) return null
-  return <ShirtIcon size={size} />
+function DivBadge({ label, color }) {
+  const styles = { blue: 'bg-blue-100 text-blue-700', pink: 'bg-pink-100 text-pink-700', purple: 'bg-purple-100 text-purple-700' }
+  return <span className={`px-1.5 py-0 rounded-full text-[10px] font-bold leading-4 ${styles[color]}`}>{label}</span>
 }
 
 function TeamCard({ team, variant }) {
-  const names = [team.competitor1_name, team.competitor2_name, team.competitor3_name]
-    .filter(Boolean)
-
+  const names = [team.competitor1_name, team.competitor2_name].filter(Boolean)
   const partnerNote = team.notes?.match(/Specified partner: (.+) \(not registered\)/)
   const specifiedPartner = partnerNote ? partnerNote[1] : null
-
-  const bgColor = {
-    arrived: 'bg-green-50 border-green-200',
-    waiting: 'bg-amber-50 border-amber-200',
-    incomplete: 'bg-red-50 border-red-200',
+  const styles = {
+    waiting:    { wrap: 'border-l-4 border-l-amber-400 bg-amber-50',  num: 'text-amber-700' },
+    incomplete: { wrap: 'border-l-4 border-l-red-500 bg-red-50',      num: 'text-red-700'   },
+    arrived:    { wrap: 'border-l-4 border-l-green-500 bg-green-50',  num: 'text-green-700' },
   }[variant]
-
-  const numberColor = {
-    arrived: 'text-green-700',
-    waiting: 'text-amber-700',
-    incomplete: 'text-red-700',
-  }[variant]
-
   return (
-    <div className={`rounded-lg border-2 px-2.5 py-2 ${bgColor}`}>
-      <span className={`text-sm font-black ${numberColor}`}>#{team.team_number}</span>
-      <div className="mt-0.5">
-        {names.map((name, i) => (
-          <p key={i} className="text-xs font-semibold text-gray-800 leading-snug">{name}</p>
-        ))}
-        {variant === 'incomplete' && (
-          <p className="text-xs text-red-500 italic leading-snug mt-0.5">
-            {specifiedPartner ? `→ ${specifiedPartner}` : 'No partner specified'}
-          </p>
-        )}
+    <div className={`rounded-md px-2 py-1.5 ${styles.wrap}`}>
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        <span className={`text-sm font-black shrink-0 ${styles.num}`}>#{team.team_number}</span>
+        <span className="text-xs font-semibold text-gray-800 leading-tight">{names.join(' / ')}</span>
       </div>
-      <div className="flex flex-wrap items-center gap-1 mt-1.5">
-        <DivisionBadges team={team} />
-      </div>
-      {(team.tshirt1 || team.tshirt2) && (
-        <div className="flex items-center gap-1 mt-1">
-          {team.tshirt1 && <ShirtBadge size={team.tshirt1} />}
-          {team.tshirt2 && <ShirtBadge size={team.tshirt2} />}
-        </div>
+      {variant === 'incomplete' && (
+        <p className="text-[10px] text-red-500 italic leading-tight mt-0.5">
+          {specifiedPartner ? `→ ${specifiedPartner}` : 'No partner specified'}
+        </p>
       )}
+      <div className="flex gap-1 mt-0.5 flex-wrap">
+        <DivBadge label="Open" color="blue" />
+        {team.is_junior && <DivBadge label="Juniors" color="purple" />}
+        {team.is_women  && <DivBadge label="Women"   color="pink"   />}
+      </div>
     </div>
   )
 }
 
-const TEAMS_PER_PAGE = 20
-const PAGE_INTERVAL = 8000 // 8 seconds per page
+function StatPill({ icon: Icon, value, label, colorClass }) {
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${colorClass}`}>
+      <Icon className="w-4 h-4 shrink-0" />
+      <span className="text-xl font-black leading-none">{value}</span>
+      <span className="text-xs font-semibold uppercase tracking-wide opacity-80 leading-tight">{label}</span>
+    </div>
+  )
+}
+
+const TABS = ['arriving', 'incomplete', 'checkedin']
+const PER_PAGE = 24
 
 export default function CheckInDisplay() {
-  const [teams, setTeams] = useState([])
-  const [counts, setCounts] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [teams, setTeams]             = useState([])
+  const [counts, setCounts]           = useState(null)
+  const [loading, setLoading]         = useState(true)
   const [lastUpdated, setLastUpdated] = useState(new Date())
-  const [arrivingPage, setArrivingPage] = useState(0)
-  const [checkedInPage, setCheckedInPage] = useState(0)
-  const arrivingPageRef = useRef(0)
-  const checkedInPageRef = useRef(0)
+  const [activeTab, setActiveTab]     = useState('arriving')
+  const tabRef                        = useRef('arriving')
+  const [arrivingPage, setArrivingPage]     = useState(0)
+  const [incompletePage, setIncompletePage] = useState(0)
+  const [checkedInPage, setCheckedInPage]   = useState(0)
+  const arrivingPageRef   = useRef(0)
+  const incompletePageRef = useRef(0)
+  const checkedInPageRef  = useRef(0)
+  const [tabProgress, setTabProgress] = useState(0)
+  const tabProgressRef = useRef(0)
 
   const fetchCounts = async () => {
-    const { data } = await supabase
-      .from('registration_counts')
-      .select('*')
-      .single()
+    const { data } = await supabase.from('registration_counts').select('*').single()
     if (data) setCounts(data)
   }
 
   const fetchTeams = async () => {
     try {
-      const { data, error } = await supabase
-        .from('teams')
-        .select('*')
-        .order('team_number', { ascending: true })
-
+      const { data, error } = await supabase.from('teams').select('*').order('team_number', { ascending: true })
       if (error) throw error
       setTeams(data || [])
       setLastUpdated(new Date())
       setLoading(false)
-    } catch (error) {
-      console.error('Error fetching teams:', error)
-      setLoading(false)
-    }
+    } catch (e) { console.error(e); setLoading(false) }
   }
 
-  // Data refresh — independent of pagination
   useEffect(() => {
-    fetchTeams()
-    fetchCounts()
-    const interval = setInterval(() => {
-      fetchTeams()
-      fetchCounts()
-    }, 5000)
+    fetchTeams(); fetchCounts()
+    const interval = setInterval(() => { fetchTeams(); fetchCounts() }, 5000)
     return () => clearInterval(interval)
   }, [])
 
-  const incomplete = teams.filter(
-    t => !t.competitor2_name || t.competitor2_name.trim() === ''
-  )
+  const incomplete    = teams.filter(t => !t.competitor2_name || !t.competitor2_name.trim())
+  const notYetArrived = teams.filter(t => !t.registered && t.competitor2_name?.trim()).sort((a,b) => a.team_number - b.team_number)
+  const checkedIn     = teams.filter(t => t.registered).sort((a,b) => new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at))
 
-  const notYetArrived = teams.filter(
-    t => !t.registered && t.competitor2_name && t.competitor2_name.trim() !== ''
-  ).sort((a, b) => a.team_number - b.team_number)
+  const arrivingPages   = Math.max(1, Math.ceil(notYetArrived.length / PER_PAGE))
+  const incompletePages = Math.max(1, Math.ceil(incomplete.length    / PER_PAGE))
+  const checkedInPages  = Math.max(1, Math.ceil(checkedIn.length     / PER_PAGE))
 
-  const checkedIn = teams
-    .filter(t => t.registered)
-    .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+  const pageSlice = (list, page) => list.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
 
-  const totalCheckedIn = checkedIn.length
+  useEffect(() => { if (arrivingPage >= arrivingPages)     { setArrivingPage(0);   arrivingPageRef.current = 0   } }, [arrivingPages])
+  useEffect(() => { if (incompletePage >= incompletePages) { setIncompletePage(0); incompletePageRef.current = 0 } }, [incompletePages])
+  useEffect(() => { if (checkedInPage >= checkedInPages)   { setCheckedInPage(0);  checkedInPageRef.current = 0  } }, [checkedInPages])
 
-  const arrivingTotalPages = Math.max(1, Math.ceil(notYetArrived.length / TEAMS_PER_PAGE))
-  const checkedInTotalPages = Math.max(1, Math.ceil(checkedIn.length / TEAMS_PER_PAGE))
-
-  const arrivingPageTeams = notYetArrived.slice(
-    arrivingPage * TEAMS_PER_PAGE,
-    (arrivingPage + 1) * TEAMS_PER_PAGE
-  )
-  const checkedInPageTeams = checkedIn.slice(
-    checkedInPage * TEAMS_PER_PAGE,
-    (checkedInPage + 1) * TEAMS_PER_PAGE
-  )
-
-  // Auto-advance arriving page — independent timer
+  // Tab rotation
   useEffect(() => {
-    if (arrivingTotalPages <= 1) return
-    const timer = setInterval(() => {
-      arrivingPageRef.current = (arrivingPageRef.current + 1) % arrivingTotalPages
-      setArrivingPage(arrivingPageRef.current)
-    }, PAGE_INTERVAL)
-    return () => clearInterval(timer)
-  }, [arrivingTotalPages])
+    const progTimer = setInterval(() => {
+      tabProgressRef.current = Math.min(tabProgressRef.current + (100 / (TAB_INTERVAL / 100)), 100)
+      setTabProgress(tabProgressRef.current)
+    }, 100)
+    const tabTimer = setInterval(() => {
+      const next = TABS[(TABS.indexOf(tabRef.current) + 1) % TABS.length]
+      tabRef.current = next; setActiveTab(next)
+      tabProgressRef.current = 0; setTabProgress(0)
+    }, TAB_INTERVAL)
+    return () => { clearInterval(progTimer); clearInterval(tabTimer) }
+  }, [])
 
-  // Auto-advance checked-in page — independent timer
+  // Page auto-advance per active tab
   useEffect(() => {
-    if (checkedInTotalPages <= 1) return
-    const timer = setInterval(() => {
-      checkedInPageRef.current = (checkedInPageRef.current + 1) % checkedInTotalPages
-      setCheckedInPage(checkedInPageRef.current)
-    }, PAGE_INTERVAL)
-    return () => clearInterval(timer)
-  }, [checkedInTotalPages])
+    if (activeTab !== 'arriving' || arrivingPages <= 1) return
+    const t = setInterval(() => { arrivingPageRef.current = (arrivingPageRef.current + 1) % arrivingPages; setArrivingPage(arrivingPageRef.current) }, PAGE_INTERVAL)
+    return () => clearInterval(t)
+  }, [activeTab, arrivingPages])
 
-  // Clamp pages if list shrinks
   useEffect(() => {
-    if (arrivingPage >= arrivingTotalPages) {
-      setArrivingPage(0)
-      arrivingPageRef.current = 0
+    if (activeTab !== 'incomplete' || incompletePages <= 1) return
+    const t = setInterval(() => { incompletePageRef.current = (incompletePageRef.current + 1) % incompletePages; setIncompletePage(incompletePageRef.current) }, PAGE_INTERVAL)
+    return () => clearInterval(t)
+  }, [activeTab, incompletePages])
+
+  useEffect(() => {
+    if (activeTab !== 'checkedin' || checkedInPages <= 1) return
+    const t = setInterval(() => { checkedInPageRef.current = (checkedInPageRef.current + 1) % checkedInPages; setCheckedInPage(checkedInPageRef.current) }, PAGE_INTERVAL)
+    return () => clearInterval(t)
+  }, [activeTab, checkedInPages])
+
+  const switchTab = (tab) => { tabRef.current = tab; setActiveTab(tab); tabProgressRef.current = 0; setTabProgress(0) }
+
+  const getContent = () => {
+    if (activeTab === 'arriving') {
+      const slice = pageSlice(notYetArrived, arrivingPage)
+      const mid = Math.ceil(slice.length / 2)
+      return { left: slice.slice(0, mid), right: slice.slice(mid), variant: 'waiting', total: notYetArrived.length, page: arrivingPage, pages: arrivingPages,
+        onPrev: () => { const p=(arrivingPage-1+arrivingPages)%arrivingPages; setArrivingPage(p); arrivingPageRef.current=p },
+        onNext: () => { const p=(arrivingPage+1)%arrivingPages; setArrivingPage(p); arrivingPageRef.current=p } }
     }
-  }, [arrivingTotalPages])
-
-  useEffect(() => {
-    if (checkedInPage >= checkedInTotalPages) {
-      setCheckedInPage(0)
-      checkedInPageRef.current = 0
+    if (activeTab === 'incomplete') {
+      const slice = pageSlice(incomplete, incompletePage)
+      const mid = Math.ceil(slice.length / 2)
+      return { left: slice.slice(0, mid), right: slice.slice(mid), variant: 'incomplete', total: incomplete.length, page: incompletePage, pages: incompletePages,
+        onPrev: () => { const p=(incompletePage-1+incompletePages)%incompletePages; setIncompletePage(p); incompletePageRef.current=p },
+        onNext: () => { const p=(incompletePage+1)%incompletePages; setIncompletePage(p); incompletePageRef.current=p } }
     }
-  }, [checkedInTotalPages])
+    const slice = pageSlice(checkedIn, checkedInPage)
+    const mid = Math.ceil(slice.length / 2)
+    return { left: slice.slice(0, mid), right: slice.slice(mid), variant: 'arrived', total: checkedIn.length, page: checkedInPage, pages: checkedInPages,
+      onPrev: () => { const p=(checkedInPage-1+checkedInPages)%checkedInPages; setCheckedInPage(p); checkedInPageRef.current=p },
+      onNext: () => { const p=(checkedInPage+1)%checkedInPages; setCheckedInPage(p); checkedInPageRef.current=p } }
+  }
 
   if (loading) {
     return (
@@ -214,165 +169,94 @@ export default function CheckInDisplay() {
     )
   }
 
+  const content = getContent()
+  const tabCfg = {
+    arriving:   { label: `Still to Arrive (${notYetArrived.length})`, Icon: Clock,         activeBar: 'bg-amber-400', activeBg: 'bg-amber-500 text-white',  inactiveBg: 'bg-amber-50 text-amber-700',  pulse: false },
+    incomplete: { label: `Incomplete (${incomplete.length})`,          Icon: AlertTriangle, activeBar: 'bg-red-500',   activeBg: 'bg-red-600 text-white',    inactiveBg: 'bg-red-50 text-red-700',      pulse: incomplete.length > 0 },
+    checkedin:  { label: `Checked In (${checkedIn.length})`,           Icon: CheckCircle,   activeBar: 'bg-green-500', activeBg: 'bg-green-600 text-white',  inactiveBg: 'bg-green-50 text-green-700',  pulse: false },
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 p-3 flex flex-col gap-3">
 
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-xl p-5 mb-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img src={SNZ_LOGO} alt="Spearfishing NZ" className="h-14 w-auto object-contain" />
-              <div>
-                <h1 className="text-3xl font-black text-blue-900">Rosemergy Catfish Cull 2026</h1>
-                <p className="text-gray-500 font-medium">Registration Check-In</p>
-              </div>
-            </div>
-            <div className="text-right text-sm text-gray-400">
-              <div>Auto-updates every 5 seconds</div>
-              <div>Last updated: {lastUpdated.toLocaleTimeString()}</div>
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="grid grid-cols-4 gap-3 mt-5">
-            <div className="bg-blue-50 rounded-lg p-3 text-center">
-              <Users className="w-6 h-6 mx-auto mb-1 text-blue-600" />
-              <div className="text-3xl font-black text-blue-700">{counts?.total_teams ?? teams.length}</div>
-              <div className="text-xs text-blue-600 font-semibold uppercase tracking-wide">Total Teams</div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-3 text-center">
-              <CheckCircle className="w-6 h-6 mx-auto mb-1 text-green-600" />
-              <div className="text-3xl font-black text-green-700">{counts?.checked_in ?? totalCheckedIn}</div>
-              <div className="text-xs text-green-600 font-semibold uppercase tracking-wide">Checked In</div>
-            </div>
-            <div className="bg-amber-50 rounded-lg p-3 text-center">
-              <Clock className="w-6 h-6 mx-auto mb-1 text-amber-600" />
-              <div className="text-3xl font-black text-amber-700">{counts?.not_yet_arrived ?? notYetArrived.length}</div>
-              <div className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Still to Arrive</div>
-            </div>
-            <div className="bg-red-50 rounded-lg p-3 text-center">
-              <AlertTriangle className="w-6 h-6 mx-auto mb-1 text-red-500" />
-              <div className="text-3xl font-black text-red-600">{counts?.incomplete ?? incomplete.length}</div>
-              <div className="text-xs text-red-500 font-semibold uppercase tracking-wide">Incomplete</div>
-            </div>
+      {/* HEADER */}
+      <div className="bg-white rounded-xl shadow-xl px-5 py-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <img src={SNZ_LOGO} alt="SNZ" className="h-10 w-auto object-contain" />
+          <div>
+            <h1 className="text-2xl font-black text-blue-900 leading-tight">Rosemergy Catfish Cull 2026</h1>
+            <p className="text-gray-400 text-xs font-medium">Registration Check-In</p>
           </div>
         </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end flex-1">
+          <StatPill icon={Users}         value={counts?.total_teams     ?? teams.length}        label="Total"      colorClass="bg-blue-50 text-blue-700"   />
+          <StatPill icon={CheckCircle}   value={counts?.checked_in      ?? checkedIn.length}    label="Checked In" colorClass="bg-green-50 text-green-700" />
+          <StatPill icon={Clock}         value={counts?.not_yet_arrived ?? notYetArrived.length} label="To Arrive" colorClass="bg-amber-50 text-amber-700" />
+          <StatPill icon={AlertTriangle} value={counts?.incomplete      ?? incomplete.length}   label="Incomplete" colorClass="bg-red-50 text-red-600"     />
+        </div>
+        <div className="text-right text-xs text-gray-400 shrink-0">
+          <div>Auto-updates every 5s</div>
+          <div>{lastUpdated.toLocaleTimeString()}</div>
+        </div>
+      </div>
 
-        {/* SECTION 1: Needs Attention */}
-        {(notYetArrived.length > 0 || incomplete.length > 0) && (
-          <div className="bg-white rounded-xl shadow-xl p-5 mb-5">
-            <h2 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
-              <Clock className="w-6 h-6 text-amber-500" />
-              Needs Attention
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {/* TAB PANEL */}
+      <div className="bg-white rounded-xl shadow-xl flex flex-col flex-1 overflow-hidden">
 
-              {/* Not Yet Arrived */}
-              {notYetArrived.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                      <h3 className="font-bold text-amber-700 uppercase tracking-wide text-sm">
-                        Still to Arrive ({notYetArrived.length})
-                      </h3>
-                    </div>
-                    {arrivingTotalPages > 1 && (
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => { const p = (arrivingPage - 1 + arrivingTotalPages) % arrivingTotalPages; setArrivingPage(p); arrivingPageRef.current = p; }}
-                          className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold flex items-center justify-center">‹</button>
-                        <span className="text-xs text-amber-600 font-semibold whitespace-nowrap">
-                          {arrivingPage + 1} / {arrivingTotalPages}
-                        </span>
-                        <button onClick={() => { const p = (arrivingPage + 1) % arrivingTotalPages; setArrivingPage(p); arrivingPageRef.current = p; }}
-                          className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-bold flex items-center justify-center">›</button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
-                    {arrivingPageTeams.map(team => (
-                      <TeamCard key={team.id} team={team} variant="waiting" />
-                    ))}
-                  </div>
-                  {arrivingTotalPages > 1 && (
-                    <div className="flex justify-center gap-1.5 mt-3">
-                      {Array.from({ length: arrivingTotalPages }).map((_, i) => (
-                        <button key={i} onClick={() => { setArrivingPage(i); arrivingPageRef.current = i; }}
-                          className={`w-2 h-2 rounded-full transition-all ${i === arrivingPage ? 'bg-amber-500 w-4' : 'bg-amber-200'}`} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+        {/* Tab bar */}
+        <div className="flex">
+          {TABS.map(tab => {
+            const cfg = tabCfg[tab]
+            const isActive = activeTab === tab
+            return (
+              <button key={tab} onClick={() => switchTab(tab)}
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 px-4 text-sm font-bold transition-colors
+                  ${isActive ? cfg.activeBg : cfg.inactiveBg}
+                  ${!isActive && cfg.pulse ? 'animate-pulse' : ''}`}>
+                <cfg.Icon className="w-4 h-4" />
+                {cfg.label}
+              </button>
+            )
+          })}
+        </div>
 
-              {/* Incomplete */}
-              {incomplete.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <h3 className="font-bold text-red-600 uppercase tracking-wide text-sm">
-                      Incomplete Teams ({incomplete.length})
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 max-h-[600px] overflow-y-auto pr-1">
-                    {incomplete.map(team => (
-                      <TeamCard key={team.id} team={team} variant="incomplete" />
-                    ))}
-                  </div>
-                </div>
-              )}
+        {/* Progress bar */}
+        <div className="h-1 bg-gray-100">
+          <div className={`h-1 transition-none ${tabCfg[activeTab].activeBar}`} style={{ width: `${tabProgress}%` }} />
+        </div>
 
-            </div>
-          </div>
-        )}
-
-        {/* SECTION 2: Checked In */}
-        <div className="bg-white rounded-xl shadow-xl p-5 mb-4">
-          <h2 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
-            <CheckCircle className="w-6 h-6 text-green-500" />
-            Checked In
-            <span className="text-base font-normal text-gray-400 ml-1">
-              {totalCheckedIn > 0 ? `(${totalCheckedIn})` : ''}
-            </span>
-          </h2>
-
-          {checkedIn.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">
-              <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-lg font-medium">No teams checked in yet</p>
+        {/* Content */}
+        <div className={`p-4 flex-1 ${activeTab === 'incomplete' && incomplete.length > 0 ? 'bg-red-50/20' : ''}`}>
+          {content.total === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <CheckCircle className="w-16 h-16 opacity-20 mb-3" />
+              <p className="text-xl font-semibold">
+                {activeTab === 'arriving'   ? 'Everyone has arrived! 🎉' :
+                 activeTab === 'incomplete' ? 'No incomplete teams 👍'  : 'No check-ins yet'}
+              </p>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
-                {checkedInPageTeams.map(team => (
-                  <TeamCard key={team.id} team={team} variant="arrived" />
+              <div className="grid grid-cols-2 gap-3">
+                {[content.left, content.right].map((col, ci) => (
+                  <div key={ci} className="flex flex-col gap-1.5">
+                    {col.map(team => <TeamCard key={team.id} team={team} variant={content.variant} />)}
+                  </div>
                 ))}
               </div>
-              {checkedInTotalPages > 1 && (
+              {content.pages > 1 && (
                 <div className="flex items-center justify-center gap-3 mt-4">
-                  <button onClick={() => { const p = (checkedInPage - 1 + checkedInTotalPages) % checkedInTotalPages; setCheckedInPage(p); checkedInPageRef.current = p; }}
-                    className="w-7 h-7 rounded bg-green-100 hover:bg-green-200 text-green-700 text-sm font-bold flex items-center justify-center">‹</button>
-                  <div className="flex gap-1.5">
-                    {Array.from({ length: checkedInTotalPages }).map((_, i) => (
-                      <button key={i} onClick={() => { setCheckedInPage(i); checkedInPageRef.current = i; }}
-                        className={`w-2 h-2 rounded-full transition-all ${i === checkedInPage ? 'bg-green-500 w-4' : 'bg-green-200'}`} />
-                    ))}
-                  </div>
-                  <span className="text-xs text-green-600 font-semibold">{checkedInPage + 1} / {checkedInTotalPages}</span>
-                  <button onClick={() => { const p = (checkedInPage + 1) % checkedInTotalPages; setCheckedInPage(p); checkedInPageRef.current = p; }}
-                    className="w-7 h-7 rounded bg-green-100 hover:bg-green-200 text-green-700 text-sm font-bold flex items-center justify-center">›</button>
+                  <button onClick={content.onPrev} className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-bold flex items-center justify-center">‹</button>
+                  <span className="text-sm text-gray-500 font-semibold">{content.page + 1} / {content.pages}</span>
+                  <button onClick={content.onNext} className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-bold flex items-center justify-center">›</button>
                 </div>
               )}
             </>
           )}
         </div>
-
-        <p className="text-center text-white text-sm pb-4 opacity-60">
-          catfish-cull.netlify.app/checkin
-        </p>
-
       </div>
+
+      <p className="text-center text-white text-xs opacity-40 pb-1">catfish-cull.netlify.app/checkin</p>
     </div>
   )
 }
