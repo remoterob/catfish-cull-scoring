@@ -127,6 +127,7 @@ function MobileRow({ team, variant }) {
 }
 
 
+function StatPill({ icon: Icon, value, label, colorClass }) {
   return (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${colorClass}`}>
       <Icon className="w-4 h-4 shrink-0" />
