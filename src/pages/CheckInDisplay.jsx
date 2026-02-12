@@ -20,39 +20,35 @@ function DivisionBadges({ team }) {
 
 function ShirtIcon({ size }) {
   if (!size) return null
+  // Strip "Male "/"Female "/"Child " prefix for display
+  const display = size.replace(/^(Male |Female |Child )/i, '')
   return (
-    <div className="flex flex-col items-center" title={`Shirt: ${size}`}>
-      <svg viewBox="0 0 100 90" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* T-shirt outline */}
+    <div className="flex flex-col items-center gap-0" title={size}>
+      <svg viewBox="0 0 100 90" className="w-6 h-6" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
           d="M30 5 L15 20 L2 15 L10 40 L20 38 L20 85 L80 85 L80 38 L90 40 L98 15 L85 20 L70 5 Q60 14 50 14 Q40 14 30 5 Z"
           fill="white"
           stroke="#9ca3af"
-          strokeWidth="3"
+          strokeWidth="4"
           strokeLinejoin="round"
         />
         <text
           x="50"
-          y="62"
+          y="63"
           textAnchor="middle"
-          fontSize={size.length > 2 ? "20" : "24"}
+          fontSize={display.length > 2 ? "26" : "30"}
           fontWeight="bold"
           fill="#374151"
           fontFamily="Arial, sans-serif"
-        >{size}</text>
+        >{display}</text>
       </svg>
     </div>
   )
 }
 
-function ShirtBadge({ size, label }) {
+function ShirtBadge({ size }) {
   if (!size) return null
-  return (
-    <div className="flex flex-col items-center gap-0">
-      <ShirtIcon size={size} />
-      <span className="text-xs text-gray-500 leading-none -mt-0.5">{label}</span>
-    </div>
-  )
+  return <ShirtIcon size={size} />
 }
 
 function TeamCard({ team, variant }) {
@@ -91,9 +87,9 @@ function TeamCard({ team, variant }) {
         <DivisionBadges team={team} />
       </div>
       {(team.tshirt1 || team.tshirt2) && (
-        <div className="flex items-center gap-2 mt-1">
-          {team.tshirt1 && <ShirtBadge size={team.tshirt1} label="C1" />}
-          {team.tshirt2 && <ShirtBadge size={team.tshirt2} label="C2" />}
+        <div className="flex items-center gap-1 mt-1">
+          {team.tshirt1 && <ShirtBadge size={team.tshirt1} />}
+          {team.tshirt2 && <ShirtBadge size={team.tshirt2} />}
         </div>
       )}
     </div>
