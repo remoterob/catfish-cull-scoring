@@ -101,12 +101,21 @@ const PAGE_INTERVAL = 8000 // 8 seconds per page
 
 export default function CheckInDisplay() {
   const [teams, setTeams] = useState([])
+  const [counts, setCounts] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [arrivingPage, setArrivingPage] = useState(0)
   const [checkedInPage, setCheckedInPage] = useState(0)
   const arrivingPageRef = useRef(0)
   const checkedInPageRef = useRef(0)
+
+  const fetchCounts = async () => {
+    const { data } = await supabase
+      .from('registration_counts')
+      .select('*')
+      .single()
+    if (data) setCounts(data)
+  }
 
   const fetchTeams = async () => {
     try {
@@ -128,7 +137,11 @@ export default function CheckInDisplay() {
   // Data refresh — independent of pagination
   useEffect(() => {
     fetchTeams()
-    const interval = setInterval(fetchTeams, 5000)
+    fetchCounts()
+    const interval = setInterval(() => {
+      fetchTeams()
+      fetchCounts()
+    }, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -225,22 +238,22 @@ export default function CheckInDisplay() {
           <div className="grid grid-cols-4 gap-3 mt-5">
             <div className="bg-blue-50 rounded-lg p-3 text-center">
               <Users className="w-6 h-6 mx-auto mb-1 text-blue-600" />
-              <div className="text-3xl font-black text-blue-700">{teams.length}</div>
+              <div className="text-3xl font-black text-blue-700">{counts?.total_teams ?? teams.length}</div>
               <div className="text-xs text-blue-600 font-semibold uppercase tracking-wide">Total Teams</div>
             </div>
             <div className="bg-green-50 rounded-lg p-3 text-center">
               <CheckCircle className="w-6 h-6 mx-auto mb-1 text-green-600" />
-              <div className="text-3xl font-black text-green-700">{totalCheckedIn}</div>
+              <div className="text-3xl font-black text-green-700">{counts?.checked_in ?? totalCheckedIn}</div>
               <div className="text-xs text-green-600 font-semibold uppercase tracking-wide">Checked In</div>
             </div>
             <div className="bg-amber-50 rounded-lg p-3 text-center">
               <Clock className="w-6 h-6 mx-auto mb-1 text-amber-600" />
-              <div className="text-3xl font-black text-amber-700">{notYetArrived.length}</div>
+              <div className="text-3xl font-black text-amber-700">{counts?.not_yet_arrived ?? notYetArrived.length}</div>
               <div className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Still to Arrive</div>
             </div>
             <div className="bg-red-50 rounded-lg p-3 text-center">
               <AlertTriangle className="w-6 h-6 mx-auto mb-1 text-red-500" />
-              <div className="text-3xl font-black text-red-600">{incomplete.length}</div>
+              <div className="text-3xl font-black text-red-600">{counts?.incomplete ?? incomplete.length}</div>
               <div className="text-xs text-red-500 font-semibold uppercase tracking-wide">Incomplete</div>
             </div>
           </div>

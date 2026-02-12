@@ -14,6 +14,7 @@ export default function PublicLeaderboard() {
   const [loading, setLoading] = useState(true)
   const [latestEntries, setLatestEntries] = useState([])
   const [allTeams, setAllTeams] = useState([])
+  const [lbCounts, setLbCounts] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(new Date())
 
   const fetchLeaderboard = async () => {
@@ -106,14 +107,24 @@ export default function PublicLeaderboard() {
     setAllTeams(data || [])
   }
 
+  const fetchLbCounts = async () => {
+    const { data } = await supabase
+      .from('leaderboard_counts')
+      .select('*')
+      .single()
+    if (data) setLbCounts(data)
+  }
+
   useEffect(() => {
     fetchLeaderboard()
     fetchEventState()
     fetchAllTeams()
+    fetchLbCounts()
     const interval = setInterval(() => {
       fetchLeaderboard()
       fetchEventState()
       fetchAllTeams()
+      fetchLbCounts()
     }, 10000)
     return () => clearInterval(interval)
   }, [])
@@ -266,9 +277,9 @@ export default function PublicLeaderboard() {
         <div className="bg-white rounded-lg shadow-lg p-3 mb-6">
           <div className="grid grid-cols-3 gap-2">
             {[
-              { id: 'All',     label: `🎯 All (${allTeams.length})` },
-              { id: 'Women',   label: `👩 Women (${allTeams.filter(t => t.is_women).length})` },
-              { id: 'Juniors', label: `🧒 Juniors (${allTeams.filter(t => t.is_junior).length})` },
+              { id: 'All',     label: `🎯 All (${lbCounts?.total_teams ?? allTeams.length})` },
+              { id: 'Women',   label: `👩 Women (${lbCounts?.women_teams ?? allTeams.filter(t => t.is_women).length})` },
+              { id: 'Juniors', label: `🧒 Juniors (${lbCounts?.junior_teams ?? allTeams.filter(t => t.is_junior).length})` },
             ].map(({ id, label }) => (
               <button
                 key={id}
