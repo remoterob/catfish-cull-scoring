@@ -78,7 +78,55 @@ function TeamCard({ team, variant }) {
   )
 }
 
-function StatPill({ icon: Icon, value, label, colorClass }) {
+// Compact single-line row for mobile
+function MobileRow({ team, variant }) {
+  const names = [team.competitor1_name, team.competitor2_name].filter(Boolean)
+  const partnerNote = team.notes?.match(/Specified partner: (.+) \(not registered\)/)
+  const specifiedPartner = partnerNote ? partnerNote[1] : null
+
+  const border = {
+    waiting:    'border-l-4 border-l-amber-400 bg-amber-50',
+    incomplete: 'border-l-4 border-l-red-500 bg-red-50',
+    arrived:    'border-l-4 border-l-green-500 bg-green-50',
+  }[variant]
+  const numColor = {
+    waiting: 'text-amber-700', incomplete: 'text-red-700', arrived: 'text-green-700'
+  }[variant]
+
+  return (
+    <div className={`flex items-center gap-3 px-3 py-2 rounded-md ${border}`}>
+      {/* Team number */}
+      <span className={`text-sm font-black shrink-0 w-8 ${numColor}`}>#{team.team_number}</span>
+
+      {/* Names */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-gray-900 leading-tight truncate">
+          {names.join(' / ')}
+        </p>
+        {variant === 'incomplete' && (
+          <p className="text-xs text-red-500 italic leading-tight truncate">
+            {specifiedPartner ? `→ ${specifiedPartner}` : 'No partner specified'}
+          </p>
+        )}
+        <div className="flex gap-1 mt-0.5 flex-wrap">
+          <DivBadge label="Open" color="blue" />
+          {team.is_junior && <DivBadge label="Juniors" color="purple" />}
+          {team.is_women  && <DivBadge label="Women"   color="pink"   />}
+        </div>
+      </div>
+
+      {/* Shirts pushed right */}
+      {(team.tshirt1 || team.tshirt2) && (
+        <div className="flex gap-1 shrink-0">
+          {team.tshirt1 && <ShirtIcon size={team.tshirt1} />}
+          {team.tshirt2 && <ShirtIcon size={team.tshirt2} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
   return (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${colorClass}`}>
       <Icon className="w-4 h-4 shrink-0" />
@@ -108,17 +156,22 @@ export default function CheckInDisplay() {
   const tabProgressRef = useRef(0)
 
   // Dynamically calculate how many teams fit on screen
-  // Header ~80px, tab bar ~56px, progress 4px, padding 24px, page nav ~40px = ~204px overhead
-  // Each card ~115px tall with gap. 4 columns.
-  const CARD_HEIGHT = 115
-  const OVERHEAD = 220
+  const CARD_HEIGHT_DESKTOP = 115
+  const CARD_HEIGHT_MOBILE  = 72
+  const OVERHEAD_DESKTOP = 220
+  const OVERHEAD_MOBILE  = 180
   const [perPage, setPerPage] = useState(20)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   useEffect(() => {
     const calc = () => {
-      const available = window.innerHeight - OVERHEAD
-      const rows = Math.max(1, Math.floor(available / CARD_HEIGHT))
-      setPerPage(rows * 4)
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      const available = window.innerHeight - (mobile ? OVERHEAD_MOBILE : OVERHEAD_DESKTOP)
+      const cardH     = mobile ? CARD_HEIGHT_MOBILE : CARD_HEIGHT_DESKTOP
+      const cols      = mobile ? 1 : 4
+      const rows      = Math.max(1, Math.floor(available / cardH))
+      setPerPage(rows * cols)
     }
     calc()
     window.addEventListener('resize', calc)
@@ -250,34 +303,50 @@ export default function CheckInDisplay() {
 
   const content = getContent()
   const tabCfg = {
-    arriving:   { label: `Still to Arrive (${notYetArrived.length})`, Icon: Clock,         activeBar: 'bg-amber-400', activeBg: 'bg-amber-500 text-white',  inactiveBg: 'bg-amber-50 text-amber-700',  pulse: false },
-    incomplete: { label: `Incomplete (${incomplete.length})`,          Icon: AlertTriangle, activeBar: 'bg-red-500',   activeBg: 'bg-red-600 text-white',    inactiveBg: 'bg-red-50 text-red-700',      pulse: incomplete.length > 0 },
-    checkedin:  { label: `Checked In (${checkedIn.length})`,           Icon: CheckCircle,   activeBar: 'bg-green-500', activeBg: 'bg-green-600 text-white',  inactiveBg: 'bg-green-50 text-green-700',  pulse: false },
+    arriving:   { label: isMobile ? `To Arrive (${notYetArrived.length})`  : `Still to Arrive (${notYetArrived.length})`, Icon: Clock,         activeBar: 'bg-amber-400', activeBg: 'bg-amber-500 text-white',  inactiveBg: 'bg-amber-50 text-amber-700',  pulse: false },
+    incomplete: { label: `Incomplete (${incomplete.length})`,                                                               Icon: AlertTriangle, activeBar: 'bg-red-500',   activeBg: 'bg-red-600 text-white',    inactiveBg: 'bg-red-50 text-red-700',      pulse: incomplete.length > 0 },
+    checkedin:  { label: isMobile ? `Checked In (${checkedIn.length})`      : `Checked In (${checkedIn.length})`,          Icon: CheckCircle,   activeBar: 'bg-green-500', activeBg: 'bg-green-600 text-white',  inactiveBg: 'bg-green-50 text-green-700',  pulse: false },
   }
 
   return (
     <div className="h-screen bg-gradient-to-br from-blue-900 to-blue-700 p-3 flex flex-col gap-3 overflow-hidden">
 
       {/* HEADER */}
-      <div className="bg-white rounded-xl shadow-xl px-5 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <img src={SNZ_LOGO} alt="SNZ" className="h-10 w-auto object-contain" />
-          <div>
-            <h1 className="text-2xl font-black text-blue-900 leading-tight">Rosemergy Catfish Cull 2026</h1>
-            <p className="text-gray-400 text-xs font-medium">Registration Check-In</p>
+      {isMobile ? (
+        /* Mobile header: compact single row */
+        <div className="bg-white rounded-xl shadow-xl px-3 py-2 flex items-center gap-3">
+          <img src={SNZ_LOGO} alt="SNZ" className="h-8 w-auto object-contain shrink-0" />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-black text-blue-900 leading-tight">Rosemergy Catfish Cull 2026</h1>
+          </div>
+          <div className="flex gap-2 shrink-0 text-sm font-bold">
+            <span className="text-green-600">{counts?.checked_in ?? checkedIn.length} ✓</span>
+            <span className="text-amber-600">{counts?.not_yet_arrived ?? notYetArrived.length} ⏱</span>
+            <span className="text-red-600">{counts?.incomplete ?? incomplete.length} ⚠</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end flex-1">
-          <StatPill icon={Users}         value={counts?.total_teams     ?? teams.length}         label="Total"      colorClass="bg-blue-50 text-blue-700"   />
-          <StatPill icon={CheckCircle}   value={counts?.checked_in      ?? checkedIn.length}     label="Checked In" colorClass="bg-green-50 text-green-700" />
-          <StatPill icon={Clock}         value={counts?.not_yet_arrived ?? notYetArrived.length} label="To Arrive"  colorClass="bg-amber-50 text-amber-700" />
-          <StatPill icon={AlertTriangle} value={counts?.incomplete      ?? incomplete.length}    label="Incomplete" colorClass="bg-red-50 text-red-600"     />
+      ) : (
+        /* Desktop header */
+        <div className="bg-white rounded-xl shadow-xl px-5 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <img src={SNZ_LOGO} alt="SNZ" className="h-10 w-auto object-contain" />
+            <div>
+              <h1 className="text-2xl font-black text-blue-900 leading-tight">Rosemergy Catfish Cull 2026</h1>
+              <p className="text-gray-400 text-xs font-medium">Registration Check-In</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end flex-1">
+            <StatPill icon={Users}         value={counts?.total_teams     ?? teams.length}         label="Total"      colorClass="bg-blue-50 text-blue-700"   />
+            <StatPill icon={CheckCircle}   value={counts?.checked_in      ?? checkedIn.length}     label="Checked In" colorClass="bg-green-50 text-green-700" />
+            <StatPill icon={Clock}         value={counts?.not_yet_arrived ?? notYetArrived.length} label="To Arrive"  colorClass="bg-amber-50 text-amber-700" />
+            <StatPill icon={AlertTriangle} value={counts?.incomplete      ?? incomplete.length}    label="Incomplete" colorClass="bg-red-50 text-red-600"     />
+          </div>
+          <div className="text-right text-xs text-gray-400 shrink-0">
+            <div>Auto-updates every 5s</div>
+            <div>{lastUpdated.toLocaleTimeString()}</div>
+          </div>
         </div>
-        <div className="text-right text-xs text-gray-400 shrink-0">
-          <div>Auto-updates every 5s</div>
-          <div>{lastUpdated.toLocaleTimeString()}</div>
-        </div>
-      </div>
+      )}
 
       {/* TAB PANEL */}
       <div className="bg-white rounded-xl shadow-xl flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -316,14 +385,25 @@ export default function CheckInDisplay() {
             </div>
           ) : (
             <>
-              {/* 4-column grid */}
-              <div className="grid grid-cols-4 gap-3">
-                {content.cols.map((col, ci) => (
-                  <div key={ci} className="flex flex-col gap-2">
-                    {col.map(team => <TeamCard key={team.id} team={team} variant={content.variant} />)}
-                  </div>
-                ))}
-              </div>
+              {isMobile ? (
+                /* Mobile: simple single-column list */
+                <div className="flex flex-col gap-1.5">
+                  {pageSlice(
+                    activeTab === 'arriving'   ? notYetArrived :
+                    activeTab === 'incomplete' ? incomplete : checkedIn,
+                    content.page
+                  ).map(team => <MobileRow key={team.id} team={team} variant={content.variant} />)}
+                </div>
+              ) : (
+                /* Desktop: 4-column grid */
+                <div className="grid grid-cols-4 gap-3">
+                  {content.cols.map((col, ci) => (
+                    <div key={ci} className="flex flex-col gap-2">
+                      {col.map(team => <TeamCard key={team.id} team={team} variant={content.variant} />)}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {content.pages > 1 && (
                 <div className="flex items-center justify-center gap-3 mt-4">
