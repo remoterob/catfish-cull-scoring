@@ -90,7 +90,7 @@ function StatPill({ icon: Icon, value, label, colorClass }) {
 }
 
 const TABS = ['arriving', 'incomplete', 'checkedin']
-const PER_PAGE = 40
+const PER_PAGE = 20
 
 export default function CheckInDisplay() {
   const [teams, setTeams]             = useState([])
@@ -107,6 +107,24 @@ export default function CheckInDisplay() {
   const checkedInPageRef  = useRef(0)
   const [tabProgress, setTabProgress] = useState(0)
   const tabProgressRef = useRef(0)
+
+  // Dynamically calculate how many teams fit on screen
+  // Header ~80px, tab bar ~56px, progress 4px, padding 24px, page nav ~40px = ~204px overhead
+  // Each card ~115px tall with gap. 4 columns.
+  const CARD_HEIGHT = 115
+  const OVERHEAD = 220
+  const [perPage, setPerPage] = useState(20)
+
+  useEffect(() => {
+    const calc = () => {
+      const available = window.innerHeight - OVERHEAD
+      const rows = Math.max(1, Math.floor(available / CARD_HEIGHT))
+      setPerPage(rows * 4)
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [])
 
   const fetchCounts = async () => {
     const { data } = await supabase.from('registration_counts').select('*').single()
@@ -133,11 +151,11 @@ export default function CheckInDisplay() {
   const notYetArrived = teams.filter(t => !t.registered && t.competitor2_name?.trim()).sort((a,b) => a.team_number - b.team_number)
   const checkedIn     = teams.filter(t => t.registered).sort((a,b) => new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at))
 
-  const arrivingPages   = Math.max(1, Math.ceil(notYetArrived.length / PER_PAGE))
-  const incompletePages = Math.max(1, Math.ceil(incomplete.length    / PER_PAGE))
-  const checkedInPages  = Math.max(1, Math.ceil(checkedIn.length     / PER_PAGE))
+  const arrivingPages   = Math.max(1, Math.ceil(notYetArrived.length / perPage))
+  const incompletePages = Math.max(1, Math.ceil(incomplete.length    / perPage))
+  const checkedInPages  = Math.max(1, Math.ceil(checkedIn.length     / perPage))
 
-  const pageSlice = (list, page) => list.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
+  const pageSlice = (list, page) => list.slice(page * perPage, (page + 1) * perPage)
 
   useEffect(() => { if (arrivingPage >= arrivingPages)     { setArrivingPage(0);   arrivingPageRef.current = 0   } }, [arrivingPages])
   useEffect(() => { if (incompletePage >= incompletePages) { setIncompletePage(0); incompletePageRef.current = 0 } }, [incompletePages])
@@ -266,8 +284,8 @@ export default function CheckInDisplay() {
           <div className={`h-1 transition-none ${tabCfg[activeTab].activeBar}`} style={{ width: `${tabProgress}%` }} />
         </div>
 
-        {/* Content */}
-        <div className={`p-4 flex-1 min-h-0 overflow-y-auto ${activeTab === 'incomplete' && incomplete.length > 0 ? 'bg-red-50/20' : ''}`}>
+        {/* Content — fixed height, no overflow */}
+        <div className={`p-4 flex-1 min-h-0 overflow-hidden ${activeTab === 'incomplete' && incomplete.length > 0 ? 'bg-red-50/20' : ''}`}>
           {content.total === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <CheckCircle className="w-16 h-16 opacity-20 mb-3" />
