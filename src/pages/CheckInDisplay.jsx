@@ -52,7 +52,7 @@ function TeamCard({ team, variant }) {
       {/* Names — larger, on separate lines */}
       <div className="mt-0.5">
         {names.map((name, i) => (
-          <p key={i} className="text-base font-bold text-gray-900 leading-tight">{name}</p>
+          <p key={i} className="text-lg font-bold text-gray-900 leading-tight">{name}</p>
         ))}
         {variant === 'incomplete' && (
           <p className="text-xs text-red-500 italic leading-tight mt-0.5">
@@ -90,7 +90,7 @@ function StatPill({ icon: Icon, value, label, colorClass }) {
 }
 
 const TABS = ['arriving', 'incomplete', 'checkedin']
-const PER_PAGE = 30
+const PER_PAGE = 40
 
 export default function CheckInDisplay() {
   const [teams, setTeams]             = useState([])
@@ -180,23 +180,23 @@ export default function CheckInDisplay() {
   const getContent = () => {
     if (activeTab === 'arriving') {
       const slice = pageSlice(notYetArrived, arrivingPage)
-      const third = Math.ceil(slice.length / 3)
-      return { cols: [slice.slice(0, third), slice.slice(third, third*2), slice.slice(third*2)],
+      const q = Math.ceil(slice.length / 4)
+      return { cols: [slice.slice(0, q), slice.slice(q, q*2), slice.slice(q*2, q*3), slice.slice(q*3)],
         variant: 'waiting', total: notYetArrived.length, page: arrivingPage, pages: arrivingPages,
         onPrev: () => { const p=(arrivingPage-1+arrivingPages)%arrivingPages; setArrivingPage(p); arrivingPageRef.current=p },
         onNext: () => { const p=(arrivingPage+1)%arrivingPages; setArrivingPage(p); arrivingPageRef.current=p } }
     }
     if (activeTab === 'incomplete') {
       const slice = pageSlice(incomplete, incompletePage)
-      const third = Math.ceil(slice.length / 3)
-      return { cols: [slice.slice(0, third), slice.slice(third, third*2), slice.slice(third*2)],
+      const q = Math.ceil(slice.length / 4)
+      return { cols: [slice.slice(0, q), slice.slice(q, q*2), slice.slice(q*2, q*3), slice.slice(q*3)],
         variant: 'incomplete', total: incomplete.length, page: incompletePage, pages: incompletePages,
         onPrev: () => { const p=(incompletePage-1+incompletePages)%incompletePages; setIncompletePage(p); incompletePageRef.current=p },
         onNext: () => { const p=(incompletePage+1)%incompletePages; setIncompletePage(p); incompletePageRef.current=p } }
     }
     const slice = pageSlice(checkedIn, checkedInPage)
-    const third = Math.ceil(slice.length / 3)
-    return { cols: [slice.slice(0, third), slice.slice(third, third*2), slice.slice(third*2)],
+    const q = Math.ceil(slice.length / 4)
+    return { cols: [slice.slice(0, q), slice.slice(q, q*2), slice.slice(q*2, q*3), slice.slice(q*3)],
       variant: 'arrived', total: checkedIn.length, page: checkedInPage, pages: checkedInPages,
       onPrev: () => { const p=(checkedInPage-1+checkedInPages)%checkedInPages; setCheckedInPage(p); checkedInPageRef.current=p },
       onNext: () => { const p=(checkedInPage+1)%checkedInPages; setCheckedInPage(p); checkedInPageRef.current=p } }
@@ -218,7 +218,7 @@ export default function CheckInDisplay() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 p-3 flex flex-col gap-3">
+    <div className="h-screen bg-gradient-to-br from-blue-900 to-blue-700 p-3 flex flex-col gap-3 overflow-hidden">
 
       {/* HEADER */}
       <div className="bg-white rounded-xl shadow-xl px-5 py-3 flex items-center justify-between gap-4">
@@ -242,7 +242,7 @@ export default function CheckInDisplay() {
       </div>
 
       {/* TAB PANEL */}
-      <div className="bg-white rounded-xl shadow-xl flex flex-col flex-1 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-xl flex flex-col flex-1 min-h-0 overflow-hidden">
 
         {/* Tab bar */}
         <div className="flex">
@@ -267,7 +267,7 @@ export default function CheckInDisplay() {
         </div>
 
         {/* Content */}
-        <div className={`p-4 flex-1 ${activeTab === 'incomplete' && incomplete.length > 0 ? 'bg-red-50/20' : ''}`}>
+        <div className={`p-4 flex-1 min-h-0 overflow-y-auto ${activeTab === 'incomplete' && incomplete.length > 0 ? 'bg-red-50/20' : ''}`}>
           {content.total === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <CheckCircle className="w-16 h-16 opacity-20 mb-3" />
@@ -278,8 +278,8 @@ export default function CheckInDisplay() {
             </div>
           ) : (
             <>
-              {/* 3-column grid */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* 4-column grid */}
+              <div className="grid grid-cols-4 gap-3">
                 {content.cols.map((col, ci) => (
                   <div key={ci} className="flex flex-col gap-2">
                     {col.map(team => <TeamCard key={team.id} team={team} variant={content.variant} />)}
