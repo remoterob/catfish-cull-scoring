@@ -18,12 +18,40 @@ function DivisionBadges({ team }) {
   )
 }
 
+function ShirtIcon({ size }) {
+  if (!size) return null
+  return (
+    <div className="flex flex-col items-center" title={`Shirt: ${size}`}>
+      <svg viewBox="0 0 100 90" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* T-shirt outline */}
+        <path
+          d="M30 5 L15 20 L2 15 L10 40 L20 38 L20 85 L80 85 L80 38 L90 40 L98 15 L85 20 L70 5 Q60 14 50 14 Q40 14 30 5 Z"
+          fill="white"
+          stroke="#9ca3af"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+        <text
+          x="50"
+          y="62"
+          textAnchor="middle"
+          fontSize={size.length > 2 ? "20" : "24"}
+          fontWeight="bold"
+          fill="#374151"
+          fontFamily="Arial, sans-serif"
+        >{size}</text>
+      </svg>
+    </div>
+  )
+}
+
 function ShirtBadge({ size, label }) {
   if (!size) return null
   return (
-    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
-      {label}: {size}
-    </span>
+    <div className="flex flex-col items-center gap-0">
+      <ShirtIcon size={size} />
+      <span className="text-xs text-gray-500 leading-none -mt-0.5">{label}</span>
+    </div>
   )
 }
 
@@ -61,13 +89,13 @@ function TeamCard({ team, variant }) {
       </div>
       <div className="flex flex-wrap items-center gap-1 mt-1.5">
         <DivisionBadges team={team} />
-        {(team.competitor1_shirt || team.competitor2_shirt) && (
-          <>
-            {team.competitor1_shirt && <ShirtBadge size={team.competitor1_shirt} label="C1" />}
-            {team.competitor2_shirt && <ShirtBadge size={team.competitor2_shirt} label="C2" />}
-          </>
-        )}
       </div>
+      {(team.competitor1_shirt || team.competitor2_shirt) && (
+        <div className="flex items-center gap-2 mt-1">
+          {team.competitor1_shirt && <ShirtBadge size={team.competitor1_shirt} label="C1" />}
+          {team.competitor2_shirt && <ShirtBadge size={team.competitor2_shirt} label="C2" />}
+        </div>
+      )}
     </div>
   )
 }
