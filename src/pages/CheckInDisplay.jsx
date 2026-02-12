@@ -47,31 +47,27 @@ function TeamCard({ team, variant }) {
   }[variant]
 
   return (
-    <div className={`rounded-lg border-2 p-3 ${bgColor}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <span className={`text-xl font-black ${numberColor}`}>#{team.team_number}</span>
-          <div className="mt-0.5">
-            {names.map((name, i) => (
-              <p key={i} className="text-sm font-semibold text-gray-800 truncate leading-tight">{name}</p>
-            ))}
-            {variant === 'incomplete' && specifiedPartner && (
-              <p className="text-xs text-red-600 mt-0.5 italic">Partner: {specifiedPartner}</p>
-            )}
-            {variant === 'incomplete' && !specifiedPartner && (
-              <p className="text-xs text-red-500 mt-0.5 italic">No partner specified</p>
-            )}
-          </div>
-          <DivisionBadges team={team} />
-        </div>
+    <div className={`rounded-lg border-2 px-2.5 py-2 ${bgColor}`}>
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        <span className={`text-sm font-black shrink-0 ${numberColor}`}>#{team.team_number}</span>
+        <span className="text-xs font-semibold text-gray-800 truncate leading-tight">
+          {names.join(' & ')}
+        </span>
       </div>
-      {/* Shirt sizes - shown for all variants */}
-      {(team.competitor1_shirt || team.competitor2_shirt) && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {team.competitor1_shirt && <ShirtBadge size={team.competitor1_shirt} label="C1" />}
-          {team.competitor2_shirt && <ShirtBadge size={team.competitor2_shirt} label="C2" />}
-        </div>
+      {variant === 'incomplete' && (
+        <p className="text-xs text-red-500 italic truncate leading-tight mt-0.5">
+          {specifiedPartner ? `Partner: ${specifiedPartner}` : 'No partner specified'}
+        </p>
       )}
+      <div className="flex flex-wrap items-center gap-1 mt-1">
+        <DivisionBadges team={team} />
+        {(team.competitor1_shirt || team.competitor2_shirt) && (
+          <>
+            {team.competitor1_shirt && <ShirtBadge size={team.competitor1_shirt} label="C1" />}
+            {team.competitor2_shirt && <ShirtBadge size={team.competitor2_shirt} label="C2" />}
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -190,7 +186,7 @@ export default function CheckInDisplay() {
                       Still to Arrive ({notYetArrived.length})
                     </h3>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 max-h-[600px] overflow-y-auto pr-1">
                     {notYetArrived.map(team => (
                       <TeamCard key={team.id} team={team} variant="waiting" />
                     ))}
@@ -207,7 +203,7 @@ export default function CheckInDisplay() {
                       Incomplete Teams ({incomplete.length})
                     </h3>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 max-h-[600px] overflow-y-auto pr-1">
                     {incomplete.map(team => (
                       <TeamCard key={team.id} team={team} variant="incomplete" />
                     ))}
@@ -235,7 +231,7 @@ export default function CheckInDisplay() {
               <p className="text-lg font-medium">No teams checked in yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
               {checkedIn.map(team => (
                 <TeamCard key={team.id} team={team} variant="arrived" />
               ))}
