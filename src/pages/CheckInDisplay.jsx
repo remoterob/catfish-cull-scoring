@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 import { Users, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
-const TAB_INTERVAL = 10000
 const PAGE_INTERVAL = 8000
 
 function DivBadge({ label, color }) {
@@ -161,39 +160,60 @@ export default function CheckInDisplay() {
   useEffect(() => { if (incompletePage >= incompletePages) { setIncompletePage(0); incompletePageRef.current = 0 } }, [incompletePages])
   useEffect(() => { if (checkedInPage >= checkedInPages)   { setCheckedInPage(0);  checkedInPageRef.current = 0  } }, [checkedInPages])
 
-  // Tab rotation + progress bar
+  // Unified sequencer: page through all blocks in current section, THEN advance to next section
+  // State stored in refs so the interval closure always sees current values
+  const pagesForTab = (tab) => {
+    if (tab === 'arriving')   return Math.max(1, Math.ceil(notYetArrived.length / perPage))
+    if (tab === 'incomplete') return Math.max(1, Math.ceil(incomplete.length    / perPage))
+    return Math.max(1, Math.ceil(checkedIn.length / perPage))
+  }
+
   useEffect(() => {
+    // Progress bar ticks every 100ms
     const progTimer = setInterval(() => {
-      tabProgressRef.current = Math.min(tabProgressRef.current + (100 / (TAB_INTERVAL / 100)), 100)
+      tabProgressRef.current = Math.min(tabProgressRef.current + (100 / (PAGE_INTERVAL / 100)), 100)
       setTabProgress(tabProgressRef.current)
     }, 100)
-    const tabTimer = setInterval(() => {
-      const next = TABS[(TABS.indexOf(tabRef.current) + 1) % TABS.length]
-      tabRef.current = next; setActiveTab(next)
-      tabProgressRef.current = 0; setTabProgress(0)
-    }, TAB_INTERVAL)
-    return () => { clearInterval(progTimer); clearInterval(tabTimer) }
-  }, [])
 
-  useEffect(() => {
-    if (activeTab !== 'arriving' || arrivingPages <= 1) return
-    const t = setInterval(() => { arrivingPageRef.current = (arrivingPageRef.current + 1) % arrivingPages; setArrivingPage(arrivingPageRef.current) }, PAGE_INTERVAL)
-    return () => clearInterval(t)
-  }, [activeTab, arrivingPages])
+    // Main advance — fires every PAGE_INTERVAL
+    const advanceTimer = setInterval(() => {
+      const tab   = tabRef.current
+      const pages = pagesForTab(tab)
 
-  useEffect(() => {
-    if (activeTab !== 'incomplete' || incompletePages <= 1) return
-    const t = setInterval(() => { incompletePageRef.current = (incompletePageRef.current + 1) % incompletePages; setIncompletePage(incompletePageRef.current) }, PAGE_INTERVAL)
-    return () => clearInterval(t)
-  }, [activeTab, incompletePages])
+      // Which page ref/setter for current tab?
+      const pageRef = tab === 'arriving' ? arrivingPageRef : tab === 'incomplete' ? incompletePageRef : checkedInPageRef
+      const setPage = tab === 'arriving' ? setArrivingPage  : tab === 'incomplete' ? setIncompletePage  : setCheckedInPage
 
-  useEffect(() => {
-    if (activeTab !== 'checkedin' || checkedInPages <= 1) return
-    const t = setInterval(() => { checkedInPageRef.current = (checkedInPageRef.current + 1) % checkedInPages; setCheckedInPage(checkedInPageRef.current) }, PAGE_INTERVAL)
-    return () => clearInterval(t)
-  }, [activeTab, checkedInPages])
+      const nextPage = pageRef.current + 1
 
-  const switchTab = (tab) => { tabRef.current = tab; setActiveTab(tab); tabProgressRef.current = 0; setTabProgress(0) }
+      if (nextPage < pages) {
+        // More pages in this section — advance page
+        pageRef.current = nextPage
+        setPage(nextPage)
+      } else {
+        // Last page of this section — reset its page and move to next tab
+        pageRef.current = 0
+        setPage(0)
+        const nextTab = TABS[(TABS.indexOf(tab) + 1) % TABS.length]
+        tabRef.current = nextTab
+        setActiveTab(nextTab)
+      }
+
+      tabProgressRef.current = 0
+      setTabProgress(0)
+    }, PAGE_INTERVAL)
+
+    return () => { clearInterval(progTimer); clearInterval(advanceTimer) }
+  }, [notYetArrived.length, incomplete.length, checkedIn.length, perPage])
+
+  const switchTab = (tab) => {
+    // Reset page for the tab we're switching to
+    if (tab === 'arriving')   { arrivingPageRef.current = 0;   setArrivingPage(0)   }
+    if (tab === 'incomplete') { incompletePageRef.current = 0; setIncompletePage(0) }
+    if (tab === 'checkedin')  { checkedInPageRef.current = 0;  setCheckedInPage(0)  }
+    tabRef.current = tab; setActiveTab(tab)
+    tabProgressRef.current = 0; setTabProgress(0)
+  }
 
   const getContent = () => {
     if (activeTab === 'arriving') {
