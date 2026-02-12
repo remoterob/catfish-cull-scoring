@@ -48,18 +48,18 @@ function TeamCard({ team, variant }) {
 
   return (
     <div className={`rounded-lg border-2 px-2.5 py-2 ${bgColor}`}>
-      <div className="flex items-baseline gap-1.5 flex-wrap">
-        <span className={`text-sm font-black shrink-0 ${numberColor}`}>#{team.team_number}</span>
-        <span className="text-xs font-semibold text-gray-800 truncate leading-tight">
-          {names.join(' & ')}
-        </span>
+      <span className={`text-sm font-black ${numberColor}`}>#{team.team_number}</span>
+      <div className="mt-0.5">
+        {names.map((name, i) => (
+          <p key={i} className="text-xs font-semibold text-gray-800 leading-snug">{name}</p>
+        ))}
+        {variant === 'incomplete' && (
+          <p className="text-xs text-red-500 italic leading-snug mt-0.5">
+            {specifiedPartner ? `→ ${specifiedPartner}` : 'No partner specified'}
+          </p>
+        )}
       </div>
-      {variant === 'incomplete' && (
-        <p className="text-xs text-red-500 italic truncate leading-tight mt-0.5">
-          {specifiedPartner ? `Partner: ${specifiedPartner}` : 'No partner specified'}
-        </p>
-      )}
-      <div className="flex flex-wrap items-center gap-1 mt-1">
+      <div className="flex flex-wrap items-center gap-1 mt-1.5">
         <DivisionBadges team={team} />
         {(team.competitor1_shirt || team.competitor2_shirt) && (
           <>
