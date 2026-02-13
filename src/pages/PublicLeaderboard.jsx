@@ -200,6 +200,12 @@ export default function PublicLeaderboard() {
             alt="Hunting & Fishing Taupo"
             className="h-10 md:h-14 w-auto object-contain"
           />
+          <div className="w-px h-10 bg-gray-200 mx-1" />
+          <img
+            src={SNZ_LOGO}
+            alt="Spearfishing NZ"
+            className="h-10 md:h-14 w-auto object-contain"
+          />
         </div>
 
         {/* LATEST ENTRIES */}
