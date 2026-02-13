@@ -20,6 +20,7 @@ export default function TeamManagement() {
     team_number: '',
     is_junior: false,
     is_women: false,
+    is_mixed: false,
     competitor1_name: '',
     competitor1_email: '',
     competitor2_name: '',
@@ -109,6 +110,7 @@ export default function TeamManagement() {
       team_number: '',
       is_junior: false,
       is_women: false,
+      is_mixed: false,
       competitor1_name: '',
       competitor1_email: '',
       competitor2_name: '',
@@ -453,10 +455,11 @@ export default function TeamManagement() {
 
     const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
 
-    const divisionStr = (isJunior, isWomen) => {
+    const divisionStr = (isJunior, isWomen, isMixed) => {
       if (isJunior && isWomen) return 'Women;Juniors'
       if (isJunior) return 'Juniors'
       if (isWomen) return 'Women'
+      if (isMixed) return 'Mixed'
       return ''
     }
 
@@ -472,7 +475,7 @@ export default function TeamManagement() {
     for (const team of teams) {
       const c1 = splitName(team.competitor1_name)
       const c2 = splitName(team.competitor2_name)
-      const divStr = divisionStr(team.is_junior, team.is_women)
+      const divStr = divisionStr(team.is_junior, team.is_women, team.is_mixed)
       const extra = [
         esc(team.team_number),
         esc(team.club || ''),
@@ -520,9 +523,10 @@ export default function TeamManagement() {
 
   const filteredTeams = teams
     .filter(t => {
-      if (filterDivision === 'All') return true // All = everyone
+      if (filterDivision === 'All') return true
       if (filterDivision === 'Juniors') return t.is_junior
       if (filterDivision === 'Women') return t.is_women
+      if (filterDivision === 'Mixed') return t.is_mixed
       return true
     })
     .filter(t => 
@@ -579,6 +583,7 @@ export default function TeamManagement() {
               <option>All</option>
               <option>Women</option>
               <option>Juniors</option>
+              <option>Mixed</option>
             </select>
 
             {/* CSV Import Button */}
@@ -698,6 +703,11 @@ export default function TeamManagement() {
                         {team.is_women && (
                           <span className="inline-block px-2 py-1 text-xs rounded bg-pink-100 text-pink-800">
                             Women
+                          </span>
+                        )}
+                        {team.is_mixed && (
+                          <span className="inline-block px-2 py-1 text-xs rounded bg-orange-100 text-orange-800">
+                            Mixed
                           </span>
                         )}
                       </div>
@@ -820,6 +830,11 @@ export default function TeamManagement() {
                           {team.is_women && (
                             <span className="inline-block px-2 py-1 text-xs rounded bg-pink-100 text-pink-800">
                               Women
+                            </span>
+                          )}
+                          {team.is_mixed && (
+                            <span className="inline-block px-2 py-1 text-xs rounded bg-orange-100 text-orange-800">
+                              Mixed
                             </span>
                           )}
                         </div>
@@ -952,6 +967,15 @@ export default function TeamManagement() {
                         className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                       />
                       <span className="text-sm">Also compete in Women</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_mixed}
+                        onChange={(e) => setFormData({...formData, is_mixed: e.target.checked})}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">Also compete in Mixed</span>
                     </label>
                   </div>
                 </div>
@@ -1152,6 +1176,7 @@ export default function TeamManagement() {
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Partner not registered — importing as Incomplete, partner name saved in Notes</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Women's division</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-500 inline-block"></span> Juniors division</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-orange-400 inline-block"></span> Mixed division</span>
             </div>
 
             {/* Team rows */}

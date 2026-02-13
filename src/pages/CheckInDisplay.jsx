@@ -6,7 +6,7 @@ const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
 const PAGE_INTERVAL = 15000
 const TABS = ['arriving', 'incomplete', 'checkedin', 'map']
 function DivBadge({ label, color }) {
-  const styles = { blue: 'bg-blue-100 text-blue-700', pink: 'bg-pink-100 text-pink-700', purple: 'bg-purple-100 text-purple-700' }
+  const styles = { blue: 'bg-blue-100 text-blue-700', pink: 'bg-pink-100 text-pink-700', purple: 'bg-purple-100 text-purple-700', orange: 'bg-orange-100 text-orange-700' }
   return <span className={`px-1.5 py-0 rounded-full text-[11px] font-bold leading-5 ${styles[color]}`}>{label}</span>
 }
 
@@ -66,6 +66,7 @@ function TeamCard({ team, variant }) {
           <DivBadge label="Open" color="blue" />
           {team.is_junior && <DivBadge label="Juniors" color="purple" />}
           {team.is_women  && <DivBadge label="Women"   color="pink"   />}
+          {team.is_mixed  && <DivBadge label="Mixed"   color="orange" />}
         </div>
         {(team.tshirt1 || team.tshirt2) && (
           <div className="flex gap-1 ml-auto">
@@ -112,6 +113,7 @@ function MobileRow({ team, variant }) {
           <DivBadge label="Open" color="blue" />
           {team.is_junior && <DivBadge label="Juniors" color="purple" />}
           {team.is_women  && <DivBadge label="Women"   color="pink"   />}
+          {team.is_mixed  && <DivBadge label="Mixed"   color="orange" />}
         </div>
       </div>
 

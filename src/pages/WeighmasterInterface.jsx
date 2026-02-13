@@ -288,6 +288,7 @@ export default function WeighmasterInterface() {
       if (t.is_junior && t.is_women) return 'Women / Juniors'
       if (t.is_junior) return 'Juniors'
       if (t.is_women) return 'Women'
+      if (t.is_mixed) return 'Mixed'
       return 'Open'
     }
 

@@ -63,6 +63,7 @@ export default function PublicLeaderboard() {
             competitor3_name,
             is_junior,
             is_women,
+            is_mixed,
             division
           )
         `)
@@ -103,7 +104,7 @@ export default function PublicLeaderboard() {
   const fetchAllTeams = async () => {
     const { data } = await supabase
       .from('teams')
-      .select('id, is_junior, is_women, competitor3_name')
+      .select('id, is_junior, is_women, is_mixed, competitor3_name')
     setAllTeams(data || [])
   }
 
@@ -135,6 +136,8 @@ export default function PublicLeaderboard() {
     ? catches.filter(c => c.is_junior)
     : selectedDivision === 'Women'
     ? catches.filter(c => c.is_women)
+    : selectedDivision === 'Mixed'
+    ? catches.filter(c => c.is_mixed)
     : catches
 
   const rankedCatches = filteredCatches.map((c, index, arr) => {
@@ -259,6 +262,9 @@ export default function PublicLeaderboard() {
                             {entry.teams.is_women && (
                               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800">Women</span>
                             )}
+                            {entry.teams.is_mixed && (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Mixed</span>
+                            )}
                           </div>
                           {entry.eligible ? (
                             <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
@@ -279,13 +285,14 @@ export default function PublicLeaderboard() {
           </div>
         )}
 
-        {/* CATEGORY TABS — 3-col grid, always fits on mobile */}
+        {/* CATEGORY TABS — 4-col grid */}
         <div className="bg-white rounded-lg shadow-lg p-3 mb-6">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {[
               { id: 'All',     label: `🎯 All (${lbCounts?.total_teams ?? allTeams.length})` },
               { id: 'Women',   label: `👩 Women (${lbCounts?.women_teams ?? allTeams.filter(t => t.is_women).length})` },
               { id: 'Juniors', label: `🧒 Juniors (${lbCounts?.junior_teams ?? allTeams.filter(t => t.is_junior).length})` },
+              { id: 'Mixed',   label: `🤝 Mixed (${lbCounts?.mixed_teams ?? allTeams.filter(t => t.is_mixed).length})` },
             ].map(({ id, label }) => (
               <button
                 key={id}
@@ -390,6 +397,7 @@ export default function PublicLeaderboard() {
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
                         {c.is_junior && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Juniors</span>}
                         {c.is_women && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800">Women</span>}
+                        {c.is_mixed && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Mixed</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center text-xl font-bold">{c.catfish_count}</td>
@@ -445,6 +453,7 @@ export default function PublicLeaderboard() {
                     <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
                     {c.is_junior && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">Jr</span>}
                     {c.is_women && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-pink-100 text-pink-800">W</span>}
+                    {c.is_mixed && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-800">Mx</span>}
                   </div>
                   <p className="text-sm text-gray-600 truncate">{c.team_names}</p>
                   {!c.eligible && <p className="text-xs text-orange-500 mt-0.5">⚠️ Ineligible for prizes</p>}
