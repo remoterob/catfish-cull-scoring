@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { Users, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
+import { Users, CheckCircle, Clock, AlertTriangle, Map } from 'lucide-react'
 
 const SNZ_LOGO = import.meta.env.VITE_SNZ_LOGO_URL || '/api/placeholder/200/80'
-const PAGE_INTERVAL = 8000
-
+const PAGE_INTERVAL = 15000
+const TABS = ['arriving', 'incomplete', 'checkedin', 'map']
 function DivBadge({ label, color }) {
   const styles = { blue: 'bg-blue-100 text-blue-700', pink: 'bg-pink-100 text-pink-700', purple: 'bg-purple-100 text-purple-700' }
   return <span className={`px-1.5 py-0 rounded-full text-[11px] font-bold leading-5 ${styles[color]}`}>{label}</span>
@@ -137,7 +137,6 @@ function StatPill({ icon: Icon, value, label, colorClass }) {
   )
 }
 
-const TABS = ['arriving', 'incomplete', 'checkedin']
 const PER_PAGE = 20
 
 export default function CheckInDisplay() {
@@ -219,6 +218,7 @@ export default function CheckInDisplay() {
   const pagesForTab = (tab) => {
     if (tab === 'arriving')   return Math.max(1, Math.ceil(notYetArrived.length / perPage))
     if (tab === 'incomplete') return Math.max(1, Math.ceil(incomplete.length    / perPage))
+    if (tab === 'map')        return 1
     return Math.max(1, Math.ceil(checkedIn.length / perPage))
   }
 
@@ -286,6 +286,9 @@ export default function CheckInDisplay() {
         onPrev: () => { const p=(incompletePage-1+incompletePages)%incompletePages; setIncompletePage(p); incompletePageRef.current=p },
         onNext: () => { const p=(incompletePage+1)%incompletePages; setIncompletePage(p); incompletePageRef.current=p } }
     }
+    if (activeTab === 'map') {
+      return { cols: [], variant: 'map', total: 1, page: 0, pages: 1, onPrev: () => {}, onNext: () => {} }
+    }
     const slice = pageSlice(checkedIn, checkedInPage)
     const q = Math.ceil(slice.length / 4)
     return { cols: [slice.slice(0, q), slice.slice(q, q*2), slice.slice(q*2, q*3), slice.slice(q*3)],
@@ -307,6 +310,7 @@ export default function CheckInDisplay() {
     arriving:   { label: isMobile ? `To Arrive (${notYetArrived.length})`  : `Still to Arrive (${notYetArrived.length})`, Icon: Clock,         activeBar: 'bg-amber-400', activeBg: 'bg-amber-500 text-white',  inactiveBg: 'bg-amber-50 text-amber-700',  pulse: false },
     incomplete: { label: `Incomplete (${incomplete.length})`,                                                               Icon: AlertTriangle, activeBar: 'bg-red-500',   activeBg: 'bg-red-600 text-white',    inactiveBg: 'bg-red-50 text-red-700',      pulse: incomplete.length > 0 },
     checkedin:  { label: isMobile ? `Checked In (${checkedIn.length})`      : `Checked In (${checkedIn.length})`,          Icon: CheckCircle,   activeBar: 'bg-green-500', activeBg: 'bg-green-600 text-white',  inactiveBg: 'bg-green-50 text-green-700',  pulse: false },
+    map:        { label: 'Lake Taupō Map',                                                                                  Icon: Map,           activeBar: 'bg-blue-500',  activeBg: 'bg-blue-600 text-white',   inactiveBg: 'bg-blue-50 text-blue-700',    pulse: false },
   }
 
   return (
@@ -375,8 +379,17 @@ export default function CheckInDisplay() {
         </div>
 
         {/* Content — fixed height, no overflow */}
-        <div className={`p-4 flex-1 min-h-0 overflow-hidden ${activeTab === 'incomplete' && incomplete.length > 0 ? 'bg-red-50/20' : ''}`}>
-          {content.total === 0 ? (
+        <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'incomplete' && incomplete.length > 0 ? 'bg-red-50/20' : ''}`}>
+          {activeTab === 'map' ? (
+            /* MAP TAB — full bleed image */
+            <div className="w-full h-full flex items-center justify-center bg-slate-100">
+              <img
+                src="https://zodqgekuackcrqyzluoo.supabase.co/storage/v1/object/public/assets/Lake%20map.png"
+                alt="Lake Taupō Map"
+                className="w-full h-full object-contain"
+              />
+            </div>
+          ) : content.total === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <CheckCircle className="w-16 h-16 opacity-20 mb-3" />
               <p className="text-xl font-semibold">
@@ -385,10 +398,10 @@ export default function CheckInDisplay() {
               </p>
             </div>
           ) : (
-            <>
+            <div className="p-4 h-full flex flex-col">
               {isMobile ? (
                 /* Mobile: simple single-column list */
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-hidden">
                   {pageSlice(
                     activeTab === 'arriving'   ? notYetArrived :
                     activeTab === 'incomplete' ? incomplete : checkedIn,
@@ -397,7 +410,7 @@ export default function CheckInDisplay() {
                 </div>
               ) : (
                 /* Desktop: 4-column grid */
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3 flex-1 min-h-0 overflow-hidden">
                   {content.cols.map((col, ci) => (
                     <div key={ci} className="flex flex-col gap-2">
                       {col.map(team => <TeamCard key={team.id} team={team} variant={content.variant} />)}
@@ -407,13 +420,13 @@ export default function CheckInDisplay() {
               )}
 
               {content.pages > 1 && (
-                <div className="flex items-center justify-center gap-3 mt-4">
+                <div className="flex items-center justify-center gap-3 mt-3 shrink-0">
                   <button onClick={content.onPrev} className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-bold flex items-center justify-center">‹</button>
                   <span className="text-sm text-gray-500 font-semibold">{content.page + 1} / {content.pages}</span>
                   <button onClick={content.onNext} className="w-7 h-7 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-bold flex items-center justify-center">›</button>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
