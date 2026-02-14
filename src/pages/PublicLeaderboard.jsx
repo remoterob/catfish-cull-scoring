@@ -73,14 +73,11 @@ export default function PublicLeaderboard() {
       if (!latestError && latestData && latestData.length > 0) {
         const entriesWithRanks = latestData.map(entry => {
           const isEligible = !entry.teams.competitor3_name || entry.teams.competitor3_name.trim() === ''
-          const overallRank = isEligible ? dataWithNames?.findIndex(c => c.team_id === entry.team_id) + 1 : null
-          const divisionTeams = dataWithNames?.filter(c => c.division === entry.teams.division) || []
-          const divisionRank = isEligible ? divisionTeams.findIndex(c => c.team_id === entry.team_id) + 1 : null
+          const overallRank = dataWithNames?.findIndex(c => c.team_id === entry.team_id) + 1
           return {
             ...entry,
             eligible: isEligible,
             overallRank: overallRank || '-',
-            divisionRank: divisionRank || '-'
           }
         })
         setLatestEntries(entriesWithRanks)
@@ -141,10 +138,10 @@ export default function PublicLeaderboard() {
     : catches
 
   const rankedCatches = filteredCatches.map((c, index, arr) => {
-    if (!c.eligible || c.status === 'disqualified') return { ...c, rank: '-' }
+    if (c.status === 'disqualified') return { ...c, rank: '-' }
     const eligibleAbove = arr
       .slice(0, index)
-      .filter(x => x.eligible && x.status !== 'disqualified' && x.catfish_count > c.catfish_count)
+      .filter(x => x.status !== 'disqualified' && x.catfish_count > c.catfish_count)
     return { ...c, rank: eligibleAbove.length + 1 }
   })
 
@@ -256,6 +253,9 @@ export default function PublicLeaderboard() {
                         <div className="space-y-1">
                           <div className="flex flex-wrap gap-1">
                             <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
+                            {!entry.eligible && (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">Triple Team</span>
+                            )}
                             {entry.teams.is_junior && (
                               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Juniors</span>
                             )}
@@ -266,15 +266,9 @@ export default function PublicLeaderboard() {
                               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Mixed</span>
                             )}
                           </div>
-                          {entry.eligible ? (
-                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                              #{entry.overallRank} Overall
-                            </span>
-                          ) : (
-                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                              ⚠️ Ineligible
-                            </span>
-                          )}
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                            #{entry.overallRank} Overall
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -382,7 +376,7 @@ export default function PublicLeaderboard() {
                   <tr
                     key={c.id}
                     className={`border-b ${
-                      !c.eligible || c.status === 'disqualified'
+                      c.status === 'disqualified'
                         ? 'bg-gray-100 text-gray-500'
                         : index % 2 === 0 ? 'bg-white' : 'bg-blue-50'
                     }`}
@@ -395,6 +389,7 @@ export default function PublicLeaderboard() {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
+                        {!c.eligible && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">Triple Team</span>}
                         {c.is_junior && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Juniors</span>}
                         {c.is_women && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800">Women</span>}
                         {c.is_mixed && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">Mixed</span>}
@@ -404,7 +399,6 @@ export default function PublicLeaderboard() {
                     <td className="px-4 py-3">
                       {c.status === 'under_protest' && <span className="text-orange-600 font-semibold text-sm">Under Protest</span>}
                       {c.status === 'disqualified' && <span className="text-red-600 font-semibold text-sm">Disqualified</span>}
-                      {!c.eligible && <span className="text-gray-500 text-sm">⚠️ Ineligible</span>}
                     </td>
                   </tr>
                 ))}
@@ -431,7 +425,7 @@ export default function PublicLeaderboard() {
             <div
               key={c.id}
               className={`bg-white rounded-lg shadow-lg overflow-hidden ${
-                !c.eligible || c.status === 'disqualified' ? 'opacity-60' : ''
+                c.status === 'disqualified' ? 'opacity-60' : ''
               }`}
             >
               {/* Colour strip for top 3 */}
@@ -451,12 +445,12 @@ export default function PublicLeaderboard() {
                   <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                     <span className="font-bold text-gray-900 text-sm">#{c.team_number}</span>
                     <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">Open</span>
+                    {!c.eligible && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-600">Triple</span>}
                     {c.is_junior && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">Jr</span>}
                     {c.is_women && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-pink-100 text-pink-800">W</span>}
                     {c.is_mixed && <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-800">Mx</span>}
                   </div>
                   <p className="text-sm text-gray-600 truncate">{c.team_names}</p>
-                  {!c.eligible && <p className="text-xs text-orange-500 mt-0.5">⚠️ Ineligible for prizes</p>}
                   {c.status === 'under_protest' && <p className="text-xs text-orange-600 mt-0.5">Under Protest</p>}
                   {c.status === 'disqualified' && <p className="text-xs text-red-600 mt-0.5">Disqualified</p>}
                 </div>
